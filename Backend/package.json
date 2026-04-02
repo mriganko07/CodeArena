@@ -4,9 +4,11 @@
   "description": "AI Interview & Assessment Platform",
   "license": "ISC",
   "author": "Adhip Halder",
-  "type": "commonjs",
+  "type": "module",
   "main": "src/server.js",
   "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
