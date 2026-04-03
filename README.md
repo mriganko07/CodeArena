@@ -24,17 +24,6 @@ npm install
 
 ---
 
-## 🔐 Setup Environment Variables
-
-Create a `.env` file inside **backend/**
-
-```env
-PORT=4000
-MONGO_URI=your_mongodb_connection_string
-```
-
----
-
 ## ▶️ Run the Project
 
 Go to **root folder** and run:
