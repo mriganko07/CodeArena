@@ -152,7 +152,6 @@ const InterviewPanel = () => {
             </div>
           </div>
 
-          {/* AI Interviewer & Controls */}
           <div className="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col shadow-2xl overflow-hidden">
             <h3 className="text-[10px] font-black text-indigo-400 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
               <span className={`h-1.5 w-1.5 rounded-full ${status === 'active' ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]' : 'bg-gray-600'}`}></span>
