@@ -24,13 +24,23 @@ export default function Header({ isInterviewActive }) {
 
   return (
     <header className="p-5 shadow-lg flex justify-between items-center bg-white/5 backdrop-blur-md relative z-50">
-      
-      <a href="/" className="text-2xl font-bold text-slate-200">
+      <a
+        href={isInterviewActive ? "#" : "/"}
+        onClick={(e) => {
+          if (isInterviewActive) {
+            e.preventDefault();
+          }
+        }}
+        className={`text-2xl font-bold text-slate-200 ${
+          isInterviewActive
+            ? "cursor-not-allowed"
+            : "cursor-pointer hover:text-white"
+        }`}
+      >
         CodeArena
       </a>
 
       <div className="relative" ref={headerRef}>
-        
         <div
           className={`flex items-center gap-2 ${
             isInterviewActive ? "cursor-not-allowed" : "cursor-pointer"
@@ -43,9 +53,7 @@ export default function Header({ isInterviewActive }) {
             SA
           </div>
 
-          <h3 className="text-slate-300 font-semibold">
-            Sanket Adhikary
-          </h3>
+          <h3 className="text-slate-300 font-semibold">Sanket Adhikary</h3>
 
           {!isInterviewActive && (
             <ChevronDown
@@ -59,22 +67,29 @@ export default function Header({ isInterviewActive }) {
 
         {open && !isInterviewActive && (
           <div className="absolute right-0 mt-4 w-56 z-[9999] bg-black/100 backdrop-blur-lg border border-white/20 rounded-2xl shadow-2xl p-3 space-y-2">
-            
-            <a href="/profile" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
+            <a
+              href="/profile"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10"
+            >
               <User size={16} strokeWidth={3} />
               My Profile
             </a>
 
-            <a href="/change-password" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
+            <a
+              href="/change-password"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10"
+            >
               <Lock size={16} strokeWidth={3} />
               Change Password
             </a>
 
-            <a href="/logout" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-red-400 hover:bg-red-500/10">
+            <a
+              href="/logout"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-red-400 hover:bg-red-500/10"
+            >
               <LogOut size={16} strokeWidth={3} />
               Log Out
             </a>
-
           </div>
         )}
       </div>
