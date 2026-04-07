@@ -62,11 +62,157 @@ const CustomModal = ({ isOpen, title, message, type, onClose, onConfirm }) => {
   );
 };
 
+const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
+  const previewVideoRef = useRef(null);
+  const [error, setError] = useState(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  useEffect(() => {
+    let stream = null;
+    let audioContext = null;
+    let analyser = null;
+    let animationFrameId;
+
+    const setupDevices = async () => {
+      try {
+        setError(null);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+
+        if (previewVideoRef.current) {
+          previewVideoRef.current.srcObject = stream;
+        }
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const checkAudioLevel = () => {
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / dataArray.length;
+          setAudioLevel(Math.min(average * 2, 100));
+          animationFrameId = requestAnimationFrame(checkAudioLevel);
+        };
+
+        checkAudioLevel();
+      } catch (err) {
+        setError(
+          "Camera or Microphone access denied. Please allow permissions in your browser.",
+        );
+        console.error("Device error:", err);
+      }
+    };
+
+    if (isOpen) {
+      setupDevices();
+    }
+
+    return () => {
+      if (stream) stream.getTracks().forEach((track) => track.stop());
+      if (audioContext && audioContext.state !== "closed") audioContext.close();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, [isOpen]);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+          />
+
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative w-full max-w-lg bg-[#0f1117]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+          >
+            <div className="space-y-6">
+              <h3 className="text-xl font-bold tracking-tight text-indigo-300 text-center">
+                Device Setup & Test
+              </h3>
+
+              {error ? (
+                <div className="p-4 bg-red-500/20 border border-red-500/40 rounded-xl text-red-300 text-sm text-center">
+                  {error}
+                </div>
+              ) : (
+                <div className="space-y-4">
+
+                  <div className="aspect-video bg-black/50 rounded-2xl overflow-hidden border border-white/10 relative">
+                    <video
+                      ref={previewVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover scale-x-[-1]"
+                    />
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2">
+                    <div className="flex justify-between text-xs text-gray-400 font-mono uppercase tracking-wider">
+                      <span>Microphone Signal</span>
+                      <span>{Math.round(audioLevel)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-black/50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 transition-all duration-75"
+                        style={{ width: `${audioLevel}%` }}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 text-center">
+                    Speak to test your microphone and verify your camera angle
+                    before starting.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 flex gap-3">
+              <button
+                onClick={onConfirm}
+                disabled={!!error}
+                className="flex-1 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+              >
+                Start Interview
+              </button>
+              <button
+                onClick={onClose}
+                className="px-6 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const InterviewPanel = () => {
   const videoRef = useRef(null);
   const violationCount = useRef(0);
   const [status, setStatus] = useState("idle");
   const [cameraError, setCameraError] = useState(null);
+
+  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
 
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
@@ -161,8 +307,6 @@ const InterviewPanel = () => {
             "danger",
           );
         }
-      } else {
-
       }
     };
 
@@ -209,7 +353,7 @@ const InterviewPanel = () => {
     };
 
     const handleBlur = () => {
-      handleViolation("You must maintain focus on the interview screen.");
+      handleViolation("Security protocol failed. Session terminated.");
     };
 
     const handleKeyDown = (e) => {
@@ -244,7 +388,7 @@ const InterviewPanel = () => {
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    document.addEventListener("keydown", handleKeyDown, true); // Use capture phase
+    document.addEventListener("keydown", handleKeyDown, true);
     document.addEventListener("contextmenu", handleContextMenu);
     window.addEventListener("blur", handleBlur);
 
@@ -259,9 +403,7 @@ const InterviewPanel = () => {
 
   const toggleInterview = () => {
     if (status === "idle") {
-      setStatus("active");
-      setCameraError(null);
-      document.documentElement.requestFullscreen?.();
+      setIsSetupModalOpen(true);
     } else {
       triggerAlert(
         "End Session?",
@@ -275,13 +417,27 @@ const InterviewPanel = () => {
     }
   };
 
+  const startActualInterview = () => {
+    setIsSetupModalOpen(false);
+    setStatus("active");
+    setCameraError(null);
+    document.documentElement.requestFullscreen?.();
+  };
+
   return (
     <div className="min-h-screen text-white font-sans selection:bg-indigo-500/30 overflow-hidden">
       <SoftBackdrop />
       <LenisScroll />
-      <InterViewHeader />
+
+      <InterViewHeader isInterviewActive={status === "active"} />
 
       <CustomModal {...modalConfig} onClose={closeModal} />
+
+      <DeviceSetupModal
+        isOpen={isSetupModalOpen}
+        onClose={() => setIsSetupModalOpen(false)}
+        onConfirm={startActualInterview}
+      />
 
       <main className="p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-80px)] max-w-[1600px] mx-auto">
         <motion.section

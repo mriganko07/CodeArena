@@ -1,9 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { User, Lock, LogOut, ChevronDown } from "lucide-react";
 
-export default function Header() {
+export default function Header({ isInterviewActive }) {
   const [open, setOpen] = useState(false);
   const headerRef = useRef();
+
+  useEffect(() => {
+    if (isInterviewActive) {
+      setOpen(false);
+    }
+  }, [isInterviewActive]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -19,15 +25,19 @@ export default function Header() {
   return (
     <header className="p-5 shadow-lg flex justify-between items-center bg-white/5 backdrop-blur-md relative z-50">
       
-      <div className="text-2xl font-bold text-slate-200">
+      <a href="/" className="text-2xl font-bold text-slate-200">
         CodeArena
-      </div>
+      </a>
 
       <div className="relative" ref={headerRef}>
         
         <div
-          className="flex items-center gap-2 cursor-pointer"
-          onClick={() => setOpen(!open)}
+          className={`flex items-center gap-2 ${
+            isInterviewActive ? "cursor-not-allowed" : "cursor-pointer"
+          }`}
+          onClick={() => {
+            if (!isInterviewActive) setOpen(!open);
+          }}
         >
           <div className="w-9 h-9 rounded-full bg-indigo-900 text-white flex items-center justify-center text-sm">
             SA
@@ -37,16 +47,17 @@ export default function Header() {
             Sanket Adhikary
           </h3>
 
-          {/* V Icon */}
-          <ChevronDown
-            size={18}
-            className={`text-slate-300 transition-transform duration-300 ${
-              open ? "rotate-180" : ""
-            }`}
-          />
+          {!isInterviewActive && (
+            <ChevronDown
+              size={18}
+              className={`text-slate-300 transition-transform duration-300 ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          )}
         </div>
 
-        {open && (
+        {open && !isInterviewActive && (
           <div className="absolute right-0 mt-4 w-56 z-[9999] bg-black/100 backdrop-blur-lg border border-white/20 rounded-2xl shadow-2xl p-3 space-y-2">
             
             <a href="/profile" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
