@@ -4,14 +4,87 @@ import SoftBackdrop from "../../components/SoftBackdrop";
 import LenisScroll from "../../components/lenis";
 import InterViewHeader from "../../components/InterViewHeader";
 
+const CustomModal = ({ isOpen, title, message, type, onClose, onConfirm }) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+          />
+
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative w-full max-w-md bg-[#0f1117]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-10 shadow-2xl overflow-hidden text-center"
+          >
+            <div
+              className={`absolute top-0 left-0 w-full h-1.5 ${type === "danger" ? "bg-red-500" : "bg-indigo-500"}`}
+            />
+
+            <div className="space-y-4">
+              <h3
+                className={`text-xl font-bold tracking-tight ${type === "danger" ? "text-red-400" : "text-indigo-300"}`}
+              >
+                {title}
+              </h3>
+              <p className="text-gray-400 text-sm leading-relaxed">{message}</p>
+            </div>
+
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              {onConfirm && (
+                <button
+                  onClick={() => {
+                    onConfirm();
+                    onClose();
+                  }}
+                  className="flex-1 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                >
+                  Confirm
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+              >
+                {onConfirm ? "Cancel" : "Close"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const InterviewPanel = () => {
   const videoRef = useRef(null);
+  const violationCount = useRef(0);
   const [status, setStatus] = useState("idle");
   const [cameraError, setCameraError] = useState(null);
 
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: null,
+  });
+
+  const closeModal = () =>
+    setModalConfig((prev) => ({ ...prev, isOpen: false }));
+
+  const triggerAlert = (title, message, type = "info", onConfirm = null) => {
+    setModalConfig({ isOpen: true, title, message, type, onConfirm });
+  };
+
   useEffect(() => {
     let stream = null;
-
     async function enableCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -22,130 +95,165 @@ const InterviewPanel = () => {
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
-        console.error("Camera Access Denied:", err);
-        setCameraError(
-          "Camera access denied. Please check browser permissions.",
-        );
+        setCameraError("Camera access denied. Please check permissions.");
       }
     }
 
     if (status === "active") {
       enableCamera();
     } else {
-      if (videoRef.current && videoRef.current.srcObject) {
+      if (videoRef.current?.srcObject) {
         videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
         videoRef.current.srcObject = null;
       }
     }
-
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      if (stream) stream.getTracks().forEach((track) => track.stop());
     };
   }, [status]);
+
   useEffect(() => {
     if (status !== "active") return;
 
     let interval;
-    let warned = false;
-
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
     const checkCamera = () => {
+      if (modalConfig.isOpen) return;
+
       const video = videoRef.current;
       if (!video || video.readyState < 2) return;
 
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const pixels = frame.data;
-
       let totalBrightness = 0;
 
       for (let i = 0; i < pixels.length; i += 40) {
-        const r = pixels[i];
-        const g = pixels[i + 1];
-        const b = pixels[i + 2];
-
-        totalBrightness += (r + g + b) / 3;
+        totalBrightness += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
       }
 
       const avgBrightness = totalBrightness / (pixels.length / 40);
 
-      if (avgBrightness < 30 && !warned) {
-        warned = true;
-        setCameraError("Camera is blocked or too dark!");
-      }
+      if (avgBrightness < 50) {
+        violationCount.current += 1;
 
-      if (avgBrightness >= 30) {
-        warned = false;
-        setCameraError(null);
+        if (violationCount.current >= 4) {
+          setStatus("idle");
+          violationCount.current = 0;
+          triggerAlert(
+            "Session Terminated",
+            "Multiple visual quality violations detected. The interview has been ended automatically due to poor lighting or camera obstruction.",
+            "danger",
+          );
+
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+        } else {
+          triggerAlert(
+            "Visual Quality Warning",
+            `Warning ${violationCount.current}/3: Your camera feed is too dark. Please fix your lighting or the session will be terminated.`,
+            "danger",
+          );
+        }
+      } else {
+
       }
     };
 
-    interval = setInterval(checkCamera, 3000);
-
-    return () => clearInterval(interval);
-  }, [status]);
+    interval = setInterval(checkCamera, 5000);
+    return () => {
+      clearInterval(interval);
+      if (status === "idle") violationCount.current = 0;
+    };
+  }, [status, modalConfig.isOpen]);
 
   useEffect(() => {
     if (status !== "active") return;
 
+    const handleViolation = (msg) => {
+      setStatus("idle");
+      triggerAlert("Security Violation", msg, "danger");
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && status === "active") {
+        document.documentElement
+          .requestFullscreen()
+          .then(() => {
+            triggerAlert(
+              "Security Violation",
+              "Exiting full-screen mode is prohibited. Your attempt has been logged.",
+              "danger",
+            );
+          })
+          .catch((err) => {
+            console.error("Fullscreen re-entry blocked:", err);
+            handleViolation("Security protocol failed. Session terminated.");
+          });
+      }
+    };
+
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        alert("Tab switching is not allowed during the interview!");
-        setStatus("idle");
+        handleViolation("Tab switching is strictly prohibited.");
       }
     };
 
     const handleBlur = () => {
-      alert("You cannot leave the interview tab!");
-      setStatus("idle");
-    };
-
-    const handleBeforeUnload = (e) => {
-      e.preventDefault();
-      e.returnValue = "";
+      handleViolation("You must maintain focus on the interview screen.");
     };
 
     const handleKeyDown = (e) => {
+      const key = e.key.toLowerCase();
+      const ctrlOrMeta = e.ctrlKey || e.metaKey;
+
+      const forbiddenKeys = ["c", "v", "u", "y", "t", "w", "l", "r", "i", "p"];
+      if (key === "escape") {
+        e.preventDefault();
+        return;
+      }
+
       if (
-        (e.ctrlKey && ["t", "w", "l", "r"].includes(e.key.toLowerCase())) ||
-        (e.altKey && e.key === "Tab")
+        (ctrlOrMeta && forbiddenKeys.includes(key)) ||
+        (e.altKey && key === "tab") ||
+        key === "f12" ||
+        (ctrlOrMeta && e.shiftKey && key === "i")
       ) {
         e.preventDefault();
-        alert("Restricted action during interview!");
+        e.stopPropagation();
+        triggerAlert(
+          "Restricted Action",
+          "Shortcut disabled. This attempt has been logged.",
+          "danger",
+        );
       }
     };
 
-    const enterFullScreen = () => {
-      const el = document.documentElement;
-      if (el.requestFullscreen) {
-        el.requestFullscreen();
-      }
+    const handleContextMenu = (e) => {
+      e.preventDefault();
     };
 
-    enterFullScreen();
-
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("keydown", handleKeyDown, true); // Use capture phase
+    document.addEventListener("contextmenu", handleContextMenu);
     window.addEventListener("blur", handleBlur);
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("contextmenu", handleContextMenu);
       window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("keydown", handleKeyDown);
-
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      }
     };
   }, [status]);
 
@@ -153,13 +261,17 @@ const InterviewPanel = () => {
     if (status === "idle") {
       setStatus("active");
       setCameraError(null);
+      document.documentElement.requestFullscreen?.();
     } else {
-      const confirmStop = window.confirm(
-        "Are you sure you want to stop the interview?",
+      triggerAlert(
+        "End Session?",
+        "Are you sure you want to stop the interview? Your progress will be finalized.",
+        "danger",
+        () => {
+          setStatus("idle");
+          if (document.fullscreenElement) document.exitFullscreen();
+        },
       );
-      if (confirmStop) {
-        setStatus("idle");
-      }
     }
   };
 
@@ -168,6 +280,8 @@ const InterviewPanel = () => {
       <SoftBackdrop />
       <LenisScroll />
       <InterViewHeader />
+
+      <CustomModal {...modalConfig} onClose={closeModal} />
 
       <main className="p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-80px)] max-w-[1600px] mx-auto">
         <motion.section
@@ -187,26 +301,22 @@ const InterviewPanel = () => {
               </span>
             </div>
             {status === "active" && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-xs font-mono text-gray-400 bg-black/20 px-3 py-1 rounded-md"
-              >
+              <div className="text-xs font-mono text-gray-400 bg-black/20 px-3 py-1 rounded-md">
                 00:45:12 Remaining
-              </motion.div>
+              </div>
             )}
           </div>
 
           <div className="flex-1 p-8 flex flex-col justify-center items-center text-center">
             <div className="space-y-6 w-full max-w-4xl px-4">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 via-indigo-200 to-white bg-clip-text text-transparent transition-all duration-500">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 via-indigo-200 to-white bg-clip-text text-transparent">
                 {status === "active"
                   ? "Question Loading..."
                   : "Ready to Start?"}
               </h1>
-              <p className="text-gray-400 text-sm md:whitespace-nowrap">
+              <p className="text-gray-400 text-sm">
                 {status === "active"
-                  ? "Code section or MCQ That will be set by backend. Solve the challenge to proceed."
+                  ? "Assessment modules are initializing. Please stay focused."
                   : "Please ensure your camera and microphone are working before clicking 'Start Interview'."}
               </p>
             </div>
@@ -223,7 +333,6 @@ const InterviewPanel = () => {
               <div className="h-full w-full flex flex-col items-center justify-center text-gray-500 gap-3">
                 <div className="p-4 rounded-full bg-white/5 border border-white/10">
                   <svg
-                    xmlns="http://www.w3.org/2000/svg"
                     width="24"
                     height="24"
                     fill="none"
@@ -231,11 +340,7 @@ const InterviewPanel = () => {
                     stroke="currentColor"
                     strokeWidth="2"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
+                    <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                 </div>
                 <span className="text-[10px] uppercase tracking-widest font-bold">
@@ -251,80 +356,49 @@ const InterviewPanel = () => {
                   muted
                   className="h-full w-full object-cover scale-x-[-1]"
                 />
-
                 {cameraError && (
                   <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-center p-4">
-                    <div className="bg-red-500/20 border border-red-500/40 text-red-300 px-6 py-4 rounded-2xl text-sm font-semibold backdrop-blur-md shadow-lg animate-pulse">
+                    <div className="bg-red-500/20 border border-red-500/40 text-red-300 px-6 py-4 rounded-2xl text-sm font-semibold backdrop-blur-md">
                       ⚠ {cameraError}
                     </div>
                   </div>
                 )}
+                <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-black uppercase animate-pulse shadow-lg">
+                  <span className="h-2 w-2 bg-white rounded-full"></span> REC
+                </div>
               </>
             )}
-
-            <AnimatePresence>
-              {status === "active" && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute top-4 left-4 flex items-center gap-2 bg-red-600/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter animate-pulse shadow-lg"
-                >
-                  <span className="h-2 w-2 bg-white rounded-full"></span> REC
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="absolute bottom-4 left-4 text-[11px] font-semibold text-white/90 bg-black/60 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              Candidate: Sanket Adhikary
-            </div>
           </div>
 
-          <div className="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 flex flex-col shadow-2xl overflow-hidden">
+          <div className="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 flex flex-col shadow-2xl">
             <h3 className="text-[10px] font-black text-indigo-400 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${status === "active" ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" : "bg-gray-600"}`}
-              ></span>
+              />
               AI Interviewer
             </h3>
 
-            <div className="flex-1 overflow-y-auto space-y-5 pr-2 mb-6 scrollbar-hide">
-              <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl rounded-tl-none text-sm text-indigo-50 leading-relaxed shadow-inner">
+            <div className="flex-1 overflow-y-auto mb-8">
+              <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-sm text-indigo-50 leading-relaxed shadow-inner">
                 {status === "active"
-                  ? "The session has started. I will be monitoring your progress. Good luck!"
-                  : "I am waiting for you to start the session. Once you are ready, click the 'Start' button below."}
+                  ? "System active. I am currently monitoring your session for compliance and technical performance."
+                  : "Welcome. Please ensure you are in a quiet room with stable lighting before initiating the session."}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                disabled={status === "idle"}
-                className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl border transition-all active:scale-95 text-xs font-bold uppercase tracking-widest
-                    ${
-                      status === "idle"
-                        ? "bg-gray-500/5 border-white/5 text-gray-600 cursor-not-allowed opacity-50"
-                        : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white"
-                    }`}
-              >
-                <div
-                  className={`h-2 w-2 rounded-full ${status === "idle" ? "bg-gray-600" : "bg-yellow-500"}`}
-                ></div>
-                Break
-              </button>
-
+            <div className="flex justify-center">
               <button
                 onClick={toggleInterview}
-                className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl border transition-all active:scale-95 text-xs font-bold uppercase tracking-widest
+                className={`w-full max-w-[300px] flex items-center justify-center gap-3 py-4 rounded-2xl border transition-all active:scale-95 text-[10px] font-black uppercase tracking-[0.2em]
                     ${
                       status === "idle"
-                        ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-400 hover:bg-indigo-500 hover:text-white shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+                        ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-400 hover:bg-indigo-500 hover:text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]"
                         : "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"
                     }`}
               >
                 {status === "idle" ? (
                   <>
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
                       width="14"
                       height="14"
                       viewBox="0 0 24 24"
@@ -332,12 +406,11 @@ const InterviewPanel = () => {
                     >
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    Start
+                    Start Interview
                   </>
                 ) : (
                   <>
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
                       width="14"
                       height="14"
                       viewBox="0 0 24 24"
@@ -345,7 +418,7 @@ const InterviewPanel = () => {
                     >
                       <rect x="6" y="6" width="12" height="12" rx="2" />
                     </svg>
-                    Stop
+                    End Interview
                   </>
                 )}
               </button>
