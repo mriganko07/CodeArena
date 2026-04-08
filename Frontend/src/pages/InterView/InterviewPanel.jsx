@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import * as faceapi from "face-api.js";
 import SoftBackdrop from "../../components/SoftBackdrop";
 import LenisScroll from "../../components/lenis";
 import InterViewHeader from "../../components/InterViewHeader";
@@ -72,14 +73,22 @@ const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
     let audioContext = null;
     let analyser = null;
     let animationFrameId;
+    let isComponentActive = true;
 
     const setupDevices = async () => {
       try {
         setError(null);
-        stream = await navigator.mediaDevices.getUserMedia({
+        const rawStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
+
+        if (!isComponentActive) {
+          rawStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        stream = rawStream;
 
         if (previewVideoRef.current) {
           previewVideoRef.current.srcObject = stream;
@@ -95,6 +104,7 @@ const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         const checkAudioLevel = () => {
+          if (!isComponentActive) return;
           analyser.getByteFrequencyData(dataArray);
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
@@ -107,10 +117,12 @@ const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
 
         checkAudioLevel();
       } catch (err) {
-        setError(
-          "Camera or Microphone access denied. Please allow permissions in your browser.",
-        );
-        console.error("Device error:", err);
+        if (isComponentActive) {
+          setError(
+            "Camera or Microphone access denied. Please allow permissions in your browser.",
+          );
+          console.error("Device error:", err);
+        }
       }
     };
 
@@ -119,6 +131,7 @@ const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
     }
 
     return () => {
+      isComponentActive = false;
       if (stream) stream.getTracks().forEach((track) => track.stop());
       if (audioContext && audioContext.state !== "closed") audioContext.close();
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -153,7 +166,6 @@ const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
                 </div>
               ) : (
                 <div className="space-y-4">
-
                   <div className="aspect-video bg-black/50 rounded-2xl overflow-hidden border border-white/10 relative">
                     <video
                       ref={previewVideoRef}
@@ -208,11 +220,27 @@ const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
 
 const InterviewPanel = () => {
   const videoRef = useRef(null);
-  const violationCount = useRef(0);
+  const streamRef = useRef(null);
   const [status, setStatus] = useState("idle");
   const [cameraError, setCameraError] = useState(null);
-
+  const [isModelsLoaded, setIsModelsLoaded] = useState(false);
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
+
+  const missingFaceFrames = useRef(0);
+  const maskFrames = useRef(0);
+
+  const violations = useRef({
+    brightness: 0,
+    mask: 0,
+    multiPerson: 0,
+    noFace: 0,
+    tab: 0,
+    keyboard: 0,
+  });
+
+  const lastViolationTime = useRef(0);
+  const isAnalyzing = useRef(false);
+  const analysisTimeoutRef = useRef(null);
 
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
@@ -230,101 +258,299 @@ const InterviewPanel = () => {
   };
 
   useEffect(() => {
-    let stream = null;
+    const loadModels = async () => {
+      try {
+        const MODEL_URL = "/models";
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        ]);
+        setIsModelsLoaded(true);
+      } catch (err) {
+        console.error(
+          "Failed to load AI models. Check public/models path.",
+          err,
+        );
+      }
+    };
+    loadModels();
+  }, []);
+
+  useEffect(() => {
+    let isComponentActive = true;
+
     async function enableCamera() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 720 },
           audio: true,
         });
+
+        if (!isComponentActive || status !== "active") {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+
+        stream.getTracks().forEach((track) => {
+          track.onended = () => {
+            if (status === "active" && isComponentActive) {
+              terminateSession(
+                "Hardware Error: Camera or microphone disconnected.",
+              );
+            }
+          };
+        });
       } catch (err) {
-        setCameraError("Camera access denied. Please check permissions.");
+        if (isComponentActive) {
+          setCameraError("Camera access denied or device unavailable.");
+        }
       }
     }
 
     if (status === "active") {
       enableCamera();
     } else {
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
     }
+
     return () => {
-      if (stream) stream.getTracks().forEach((track) => track.stop());
+      isComponentActive = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
     };
   }, [status]);
 
+  const terminateSession = (reason) => {
+    setStatus("idle");
+    triggerAlert("Session Terminated", reason, "danger");
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    missingFaceFrames.current = 0;
+    maskFrames.current = 0;
+    violations.current = {
+      brightness: 0,
+      mask: 0,
+      multiPerson: 0,
+      noFace: 0,
+      tab: 0,
+      keyboard: 0,
+    };
+  };
+
   useEffect(() => {
-    if (status !== "active") return;
+    if (status !== "active" || !isModelsLoaded) return;
 
-    let interval;
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    canvas.width = 64;
+    canvas.height = 36;
 
-    const checkCamera = () => {
-      if (modalConfig.isOpen) return;
+    let isRunning = true;
 
-      const video = videoRef.current;
-      if (!video || video.readyState < 2) return;
+    const performAnalysis = async () => {
+      if (!isRunning || isAnalyzing.current || modalConfig.isOpen) return;
+      isAnalyzing.current = true;
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try {
+        const video = videoRef.current;
 
-      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = frame.data;
-      let totalBrightness = 0;
+        if (!video || video.readyState < 2 || video.paused || video.ended) {
+          isAnalyzing.current = false;
+          return;
+        }
 
-      for (let i = 0; i < pixels.length; i += 40) {
-        totalBrightness += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
-      }
+        const now = Date.now();
+        const isCooldown = now - lastViolationTime.current < 4000;
 
-      const avgBrightness = totalBrightness / (pixels.length / 40);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = frame.data;
+        let totalBrightness = 0;
 
-      if (avgBrightness < 50) {
-        violationCount.current += 1;
+        for (let i = 0; i < pixels.length; i += 16) {
+          totalBrightness += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+        }
+        const avgBrightness = totalBrightness / (pixels.length / 16);
 
-        if (violationCount.current >= 4) {
-          setStatus("idle");
-          violationCount.current = 0;
-          triggerAlert(
-            "Session Terminated",
-            "Multiple visual quality violations detected. The interview has been ended automatically due to poor lighting or camera obstruction.",
-            "danger",
-          );
+        if (avgBrightness < 30) {
+          if (!isCooldown) {
+            violations.current.brightness += 1;
+            lastViolationTime.current = Date.now();
 
-          if (document.fullscreenElement) {
-            document.exitFullscreen().catch(() => {});
+            if (violations.current.brightness >= 4) {
+              terminateSession(
+                "Multiple visual quality violations. Environment too dark or camera blocked.",
+              );
+            } else {
+              triggerAlert(
+                "Hardware/Environment Warning",
+                `Warning ${violations.current.brightness}/3: Lighting is too dark or camera is covered.`,
+                "danger",
+              );
+            }
+          }
+          isAnalyzing.current = false;
+          return;
+        }
+
+        const detections = await faceapi
+          .detectAllFaces(
+            video,
+            new faceapi.TinyFaceDetectorOptions({
+              inputSize: 224,
+              scoreThreshold: 0.35,
+            }),
+          )
+          .withFaceLandmarks();
+
+        if (detections.length === 0) {
+          missingFaceFrames.current += 1;
+
+          if (missingFaceFrames.current >= 5) {
+            if (!isCooldown) {
+              violations.current.noFace += 1;
+              lastViolationTime.current = Date.now();
+              missingFaceFrames.current = 0;
+
+              if (violations.current.noFace >= 4) {
+                terminateSession(
+                  "Session terminated. Face obscured or not visible in frame.",
+                );
+              } else {
+                triggerAlert(
+                  "Visibility Warning",
+                  `Warning ${violations.current.noFace}/3: Face not detected. Please remain clearly in the frame.`,
+                  "danger",
+                );
+              }
+            }
+            isAnalyzing.current = false;
+            return;
           }
         } else {
-          triggerAlert(
-            "Visual Quality Warning",
-            `Warning ${violationCount.current}/3: Your camera feed is too dark. Please fix your lighting or the session will be terminated.`,
-            "danger",
-          );
+          missingFaceFrames.current = 0;
         }
+
+        const confidentDetections = detections.filter(
+          (d) => d.detection.score > 0.65,
+        );
+        if (confidentDetections.length > 1) {
+          if (!isCooldown) {
+            violations.current.multiPerson += 1;
+            lastViolationTime.current = Date.now();
+
+            if (violations.current.multiPerson >= 2) {
+              terminateSession(
+                "Session terminated. Unauthorized persons detected in the frame.",
+              );
+            } else {
+              triggerAlert(
+                "Security Warning",
+                `Warning ${violations.current.multiPerson}/1: Multiple people detected. Please ensure you are alone.`,
+                "danger",
+              );
+            }
+          }
+          isAnalyzing.current = false;
+          return;
+        }
+
+        if (detections.length > 0) {
+          const landmarks = detections[0].landmarks;
+          const jaw = landmarks.getJawOutline();
+          const mouth = landmarks.getMouth();
+
+          const mouthWidth = Math.abs(mouth[0].x - mouth[6].x);
+          const jawWidth = Math.abs(jaw[0].x - jaw[16].x);
+
+          const maskHeuristicRatio = mouthWidth / jawWidth;
+
+          if (maskHeuristicRatio < 0.15) {
+            maskFrames.current += 1;
+
+            if (maskFrames.current >= 3) {
+              if (!isCooldown) {
+                violations.current.mask += 1;
+                lastViolationTime.current = Date.now();
+                maskFrames.current = 0;
+
+                if (violations.current.mask >= 3) {
+                  terminateSession(
+                    "Session terminated. Face obstruction/mask strictly prohibited.",
+                  );
+                } else {
+                  triggerAlert(
+                    "Compliance Warning",
+                    `Warning ${violations.current.mask}/2: Face obstruction detected. Please remove any masks.`,
+                    "danger",
+                  );
+                }
+              }
+              isAnalyzing.current = false;
+              return;
+            }
+          } else {
+            maskFrames.current = 0;
+          }
+        }
+      } catch (err) {
+        console.error("Proctoring analysis error:", err);
+      } finally {
+        isAnalyzing.current = false;
       }
     };
 
-    interval = setInterval(checkCamera, 5000);
-    return () => {
-      clearInterval(interval);
-      if (status === "idle") violationCount.current = 0;
+    const loop = async () => {
+      if (!isRunning) return;
+      await performAnalysis();
+      analysisTimeoutRef.current = setTimeout(loop, 1500);
     };
-  }, [status, modalConfig.isOpen]);
+
+    loop();
+
+    return () => {
+      isRunning = false;
+      if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
+    };
+  }, [status, isModelsLoaded, modalConfig.isOpen]);
 
   useEffect(() => {
     if (status !== "active") return;
 
-    const handleViolation = (msg) => {
-      setStatus("idle");
-      triggerAlert("Security Violation", msg, "danger");
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
+    const handleFocusLoss = (reason) => {
+      const now = Date.now();
+      if (now - lastViolationTime.current < 2000 || modalConfig.isOpen) return;
+      lastViolationTime.current = now;
+
+      violations.current.tab += 1;
+      if (violations.current.tab >= 3) {
+        terminateSession(
+          `Session terminated. Multiple instances of ${reason}.`,
+        );
+      } else {
+        triggerAlert(
+          "Environment Warning",
+          `Warning ${violations.current.tab}/2: ${reason} is strictly prohibited.`,
+          "danger",
+        );
       }
     };
 
@@ -333,34 +559,27 @@ const InterviewPanel = () => {
         document.documentElement
           .requestFullscreen()
           .then(() => {
-            triggerAlert(
-              "Security Violation",
-              "Exiting full-screen mode is prohibited. Your attempt has been logged.",
-              "danger",
-            );
+            handleFocusLoss("Exiting full-screen mode");
           })
-          .catch((err) => {
-            console.error("Fullscreen re-entry blocked:", err);
-            handleViolation("Security protocol failed. Session terminated.");
+          .catch(() => {
+            terminateSession("Security protocol failed. Session terminated.");
           });
       }
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        handleViolation("Tab switching is strictly prohibited.");
-      }
+      if (document.hidden) handleFocusLoss("Tab switching");
     };
 
     const handleBlur = () => {
-      handleViolation("Security protocol failed. Session terminated.");
+      handleFocusLoss("Window focus loss");
     };
 
     const handleKeyDown = (e) => {
       const key = e.key.toLowerCase();
       const ctrlOrMeta = e.ctrlKey || e.metaKey;
-
       const forbiddenKeys = ["c", "v", "u", "y", "t", "w", "l", "r", "i", "p"];
+
       if (key === "escape") {
         e.preventDefault();
         return;
@@ -374,17 +593,27 @@ const InterviewPanel = () => {
       ) {
         e.preventDefault();
         e.stopPropagation();
-        triggerAlert(
-          "Restricted Action",
-          "Shortcut disabled. This attempt has been logged.",
-          "danger",
-        );
+
+        const now = Date.now();
+        if (now - lastViolationTime.current < 1000) return;
+        lastViolationTime.current = now;
+
+        violations.current.keyboard += 1;
+        if (violations.current.keyboard >= 3) {
+          terminateSession(
+            "Session terminated due to prohibited keyboard shortcut usage.",
+          );
+        } else {
+          triggerAlert(
+            "Restricted Action",
+            `Warning ${violations.current.keyboard}/2: Keyboard shortcuts are disabled.`,
+            "danger",
+          );
+        }
       }
     };
 
-    const handleContextMenu = (e) => {
-      e.preventDefault();
-    };
+    const handleContextMenu = (e) => e.preventDefault();
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -399,9 +628,18 @@ const InterviewPanel = () => {
       document.removeEventListener("contextmenu", handleContextMenu);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [status]);
+  }, [status, modalConfig.isOpen]);
 
   const toggleInterview = () => {
+    if (!isModelsLoaded) {
+      triggerAlert(
+        "System Initializing",
+        "Please wait for the AI proctoring models to load.",
+        "info",
+      );
+      return;
+    }
+
     if (status === "idle") {
       setIsSetupModalOpen(true);
     } else {
@@ -412,6 +650,16 @@ const InterviewPanel = () => {
         () => {
           setStatus("idle");
           if (document.fullscreenElement) document.exitFullscreen();
+          missingFaceFrames.current = 0;
+          maskFrames.current = 0;
+          violations.current = {
+            brightness: 0,
+            mask: 0,
+            multiPerson: 0,
+            noFace: 0,
+            tab: 0,
+            keyboard: 0,
+          };
         },
       );
     }
@@ -421,16 +669,18 @@ const InterviewPanel = () => {
     setIsSetupModalOpen(false);
     setStatus("active");
     setCameraError(null);
-    document.documentElement.requestFullscreen?.();
+    document.documentElement.requestFullscreen?.().catch(() => {
+      console.warn(
+        "Fullscreen API rejected by browser. User must interact first.",
+      );
+    });
   };
 
   return (
     <div className="min-h-screen text-white font-sans selection:bg-indigo-500/30 overflow-hidden">
       <SoftBackdrop />
       <LenisScroll />
-
       <InterViewHeader isInterviewActive={status === "active"} />
-
       <CustomModal {...modalConfig} onClose={closeModal} />
 
       <DeviceSetupModal
@@ -537,19 +787,24 @@ const InterviewPanel = () => {
             <div className="flex-1 overflow-y-auto mb-8">
               <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-sm text-indigo-50 leading-relaxed shadow-inner">
                 {status === "active"
-                  ? "System active. I am currently monitoring your session for compliance and technical performance."
-                  : "Welcome. Please ensure you are in a quiet room with stable lighting before initiating the session."}
+                  ? "System active. AI proctoring is continuously monitoring face visibility, attention, and environment integrity."
+                  : isModelsLoaded
+                    ? "Welcome. AI Models loaded. Ensure you are in a quiet room with stable lighting before initiating."
+                    : "Initializing AI Proctoring Subsystems. Please wait..."}
               </div>
             </div>
 
             <div className="flex justify-center">
               <button
                 onClick={toggleInterview}
+                disabled={!isModelsLoaded && status === "idle"}
                 className={`w-full max-w-[300px] flex items-center justify-center gap-3 py-4 rounded-2xl border transition-all active:scale-95 text-[10px] font-black uppercase tracking-[0.2em]
                     ${
-                      status === "idle"
-                        ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-400 hover:bg-indigo-500 hover:text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]"
-                        : "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"
+                      !isModelsLoaded && status === "idle"
+                        ? "bg-gray-800/50 border-gray-700 text-gray-500 cursor-not-allowed"
+                        : status === "idle"
+                          ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-400 hover:bg-indigo-500 hover:text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]"
+                          : "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"
                     }`}
               >
                 {status === "idle" ? (
@@ -562,7 +817,7 @@ const InterviewPanel = () => {
                     >
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    Start Interview
+                    {isModelsLoaded ? "Start Interview" : "Loading AI..."}
                   </>
                 ) : (
                   <>
