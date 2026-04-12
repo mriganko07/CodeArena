@@ -5,6 +5,9 @@ import InterviewPanel from "./pages/InterView/InterviewPanel";
 import PythonPracticeApp from './pages/Prcaticeset/PythonPracticeApp';
 import DomainSelectorPage from './pages/Prcaticeset/DomainSelectorPage';
 import PracticeSetPage from './pages/Prcaticeset/PracticeSetPage';
+import Dashboard from "./pages/Dashboard/Dashboard";
+import './App.css';
+
 
 function App() {
   return (
@@ -15,6 +18,7 @@ function App() {
         <Route path="/interviewPanel" element={<InterviewPanel />} />
         <Route path="/practiceset" element={<PythonPracticeApp />} />
         <Route path="/domainselector" element={<DomainSelectorPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </BrowserRouter>
   );
