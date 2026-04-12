@@ -84,6 +84,8 @@ const groups = [
   },
 ];
 
+const totalTopics = groups.reduce((sum, g) => sum + g.domains.length, 0);
+
 export default function DomainSelectorPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -108,74 +110,125 @@ export default function DomainSelectorPage() {
   return (
     <div className="min-h-screen bg-[#050816] text-white">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8 rounded-3xl border border-white/10 bg-[#1F2937] p-6 shadow-2xl shadow-black/30 sm:p-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#6C63FF]/30 bg-[#2A1454] px-4 py-2 text-sm text-white/90">
-            <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
-            Interview Practice Domain Selector
+
+        {/* ── HEADER CARD ── */}
+        <div className="mb-10 rounded-3xl border border-white/10 bg-[#1F2937] p-6 shadow-2xl shadow-black/30 sm:p-8">
+
+          {/* top row */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#6C63FF]/30 bg-[#2A1454] px-4 py-2 text-sm text-white/90">
+              <span className="text-base">✦</span>
+              Interview Practice Domain Selector
+            </div>
+
+            {/* categories · topics badge */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#111827] px-4 py-2 text-sm text-white/70">
+              <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
+              {groups.length} categories · {totalTopics} topics
+            </div>
           </div>
 
+          {/* heading + search row */}
           <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.9fr] lg:items-end">
             <div>
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-                Choose a domain and start practicing
+                Choose a domain,{" "}
+                <span className="bg-gradient-to-r from-[#7C6FF7] to-[#6C63FF] bg-clip-text text-transparent">
+                  start practicing.
+                </span>
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70 sm:text-base">
-                Search and select a domain from grouped categories. Each card navigates to a practice set page.
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/60 sm:text-base">
+                Browse every interview topic in one place. Search fast, pick a domain, and jump straight into
+                a focused practice session.
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-              <label className="mb-2 block text-sm font-medium text-white/80">Search domains</label>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Type to filter..."
-                className="w-full rounded-xl border border-white/10 bg-[#1F2937] px-4 py-3 text-white outline-none placeholder:text-white/40 focus:border-[#6C63FF] focus:ring-2 focus:ring-[#6C63FF]/30"
-              />
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-white/50">
+                Search Domains
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-base">
+                  🔍
+                </span>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Type to filter..."
+                  className="w-full rounded-xl border border-white/10 bg-[#1F2937] py-3 pl-9 pr-4 text-white outline-none placeholder:text-white/30 focus:border-[#6C63FF] focus:ring-2 focus:ring-[#6C63FF]/30"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="space-y-8">
-          {filteredGroups.map((group) => (
-            <section key={group.category} className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold sm:text-xl">{group.category}</h2>
-                <span className="rounded-full border border-white/10 bg-[#111827] px-3 py-1 text-xs text-white/60">
+        {/* ── CATEGORY SECTIONS ── */}
+        <div className="space-y-6">
+          {filteredGroups.map((group, idx) => (
+            <section
+              key={group.category}
+              // className="rounded-3xl border bg-[#1F2937] p-6 shadow-xl shadow-black/20 sm:p-8"
+              className="rounded-[22px] border border-white/7 bg-white/[0.03] p-5 sm:p-6"
+              // style={{ borderColor: "#0d1117" }}
+            >
+              {/* section label + heading */}
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <span className="mb-1 inline-block rounded-full bg-[#2A1454] px-3 py-0.5 text-xs font-semibold text-[#6C63FF]">
+                    Section {idx + 1}
+                  </span>
+                  <h2 className="text-xl font-bold sm:text-2xl">{group.category}</h2>
+                  <p className="mt-0.5 text-xs text-white/40">
+                    {group.domains.length} topic{group.domains.length !== 1 ? "s" : ""} available
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-[#111827] px-3 py-1 text-xs text-white/50">
                   {group.domains.length} topics
                 </span>
               </div>
 
+              {/* domain cards */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {group.domains.map((domain) => {
                   const active = selected === domain;
                   return (
                     <button
                       key={domain}
-                      onClick={() => openPractice(domain)}
+                      // onClick={() => openPractice(domain)}
                       className={[
-                        "group rounded-2xl border p-4 text-left transition-all duration-300",
-                        "bg-[#1F2937] hover:-translate-y-1 hover:bg-[#111827] hover:shadow-lg hover:shadow-black/30",
+                        "group relative rounded-2xl border p-4 text-left transition-all duration-300",
+                        "bg-[#111827] hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40",
                         active
                           ? "border-[#6C63FF] ring-2 ring-[#6C63FF]/30"
-                          : "border-white/10 hover:border-[#6C63FF]/40",
+                          : "border-white/10 hover:border-[#6C63FF]/50",
                       ].join(" ")}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-widest text-white/40">{group.category}</p>
-                          <h3 className="mt-2 text-base font-semibold leading-6 text-white group-hover:text-[#6C63FF]">
-                            {domain}
-                          </h3>
-                        </div>
-                        <div className="mt-1 rounded-xl bg-[#2A1454] p-2 text-[#6C63FF] transition group-hover:bg-[#6C63FF] group-hover:text-white">
+                      {/* category pill */}
+                      <span className="inline-block rounded-full bg-[#2A1454] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-[#6C63FF]">
+                        {group.category}
+                      </span>
+
+                      {/* title + arrow */}
+                      <div className="mt-3 flex items-start justify-between gap-3">
+                        <h3 className="text-sm font-semibold leading-5 text-white group-hover:text-[#6C63FF] transition-colors">
+                          {domain}
+                        </h3>
+                        <div
+                          className={[
+                            "shrink-0 rounded-xl p-2 text-sm transition-all duration-200",
+                            active
+                              ? "bg-[#6C63FF] text-white"
+                              : "bg-[#2A1454] text-[#6C63FF] group-hover:bg-[#6C63FF] group-hover:text-white",
+                          ].join(" ")}
+                        >
                           →
                         </div>
                       </div>
 
-                      <div className="mt-4 flex items-center gap-2 text-xs text-white/50">
+                      {/* footer */}
+                      <div className="mt-4 flex items-center gap-2 text-xs text-white/40">
                         <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
-                        Click to open practice set
+                        Open practice set
                       </div>
                     </button>
                   );
