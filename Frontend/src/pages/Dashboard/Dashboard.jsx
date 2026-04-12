@@ -73,20 +73,20 @@ const Dashboard = () => {
               <span className={styles.titleGradientforOverview}>Overview</span>
             </h1>
             <p className={styles.subtitle}>Track your learning journey and progress</p>
-          </div>
-          <div className={styles.headerRight}>
-            <div className={styles.dateCard}>
-              <div className={styles.dateIcon}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-              </div>
-              <div className={styles.dateText}>
-                <span className={styles.dateLabel}>Today</span>
-                <span className={styles.dateValue}>Dec 15, 2024</span>
+            <div className={styles.dateCardWrapper}>
+              <div className={styles.dateCard}>
+                <div className={styles.dateIcon}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div className={styles.dateText}>
+                  <span className={styles.dateLabel}>Today</span>
+                  <span className={styles.dateValue}>Dec 15, 2024</span>
+                </div>
               </div>
             </div>
           </div>
