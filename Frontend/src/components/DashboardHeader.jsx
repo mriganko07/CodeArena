@@ -22,7 +22,7 @@ const Header = () => {
 
     return (
         <>
-            <header className="p-5 shadow-lg flex justify-between items-center bg-white/5 backdrop-blur-md relative">
+            <header className="p-5 shadow-lg flex justify-between items-center bg-slate-950/90 backdrop-blur-md relative overflow-visible z-20">
 
                 <div className="text-2xl font-bold text-slate-200">
                     CodeArena
@@ -63,7 +63,7 @@ const Header = () => {
                         onClick={() => setOpen(!open)}
                     >
                         <div className="w-9 h-9 rounded-full bg-indigo-900 text-white flex items-center justify-center text-sm">
-                            AH
+                            SG
                         </div>
 
                         <h3 className="text-slate-300 font-semibold">
@@ -77,19 +77,19 @@ const Header = () => {
                     </div>
 
                     {open && (
-                        <div className="absolute right-0 mt-7 w-56 bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-lg p-3 space-y-2">
+                        <div className="absolute right-0 mt-7 w-56 z-50 bg-slate-950/95 border border-slate-800 rounded-3xl shadow-2xl p-4 space-y-2">
 
-                            <a href="/profile" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
+                            <a href="/profile" className="flex items-center gap-2 px-3 py-2 rounded-2xl font-semibold text-slate-100 hover:bg-slate-800/60">
                                 <User size={16} strokeWidth={3} />
                                 My Profile
                             </a>
 
-                            <a href="/change-password" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
+                            <a href="/change-password" className="flex items-center gap-2 px-3 py-2 rounded-2xl font-semibold text-slate-100 hover:bg-slate-800/60">
                                 <Lock size={16} strokeWidth={3} />
                                 Change Password
                             </a>
 
-                            <a href="/logout" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-red-400 hover:bg-red-500/10">
+                            <a href="/logout" className="flex items-center gap-2 px-3 py-2 rounded-2xl font-semibold text-rose-400 hover:bg-rose-500/10">
                                 <LogOut size={16} strokeWidth={3} />
                                 Log Out
                             </a>
