@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './Dashboard.module.css';
 import Header from '../../components/DashboardHeader';
+import DateTime from '../../components/DateTime';
 
 
 const Dashboard = () => {
@@ -85,7 +86,7 @@ const Dashboard = () => {
                 </div>
                 <div className={styles.dateText}>
                   <span className={styles.dateLabel}>Today</span>
-                  <span className={styles.dateValue}>Dec 15, 2024</span>
+                  <span className={styles.dateValue}><DateTime /></span>
                 </div>
               </div>
             </div>
