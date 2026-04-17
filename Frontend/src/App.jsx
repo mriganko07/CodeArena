@@ -6,6 +6,7 @@ import PythonPracticeApp from './pages/Prcaticeset/PythonPracticeApp';
 import DomainSelectorPage from './pages/Prcaticeset/DomainSelectorPage';
 import PracticeSetPage from './pages/Prcaticeset/PracticeSetPage';
 import Dashboard from "./pages/Dashboard/Dashboard";
+import ProfileDashboard from "./pages/LoginProfile/ProfileDashboard";
 import './App.css';
 
 
@@ -19,6 +20,7 @@ function App() {
         <Route path="/practiceset" element={<PythonPracticeApp />} />
         <Route path="/domainselector" element={<DomainSelectorPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<ProfileDashboard />} />
       </Routes>
     </BrowserRouter>
   );

@@ -1,6 +1,8 @@
 /* ========== Main Dashboard ========== */
 .dashboard {
   padding: 10px;
+  margin: 30px;
+  margin-top: 0;
 }
 
 /* ========== Header Section ========== */
