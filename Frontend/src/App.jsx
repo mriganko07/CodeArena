@@ -7,7 +7,10 @@ import DomainSelectorPage from './pages/Prcaticeset/DomainSelectorPage';
 import PracticeSetPage from './pages/Prcaticeset/PracticeSetPage';
 import Dashboard from "./pages/Dashboard/Dashboard";
 import ProfileDashboard from "./pages/LoginProfile/ProfileDashboard";
+import AuthPage from "./pages/LoginProfile/AuthPage";
+import ForgotPassword from "./pages/LoginProfile/ForgotPassword";
 import './App.css';
+
 
 
 function App() {
@@ -21,6 +24,8 @@ function App() {
         <Route path="/domainselector" element={<DomainSelectorPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<ProfileDashboard />} />
+        <Route path="/login" element={<AuthPage />} />
+        <Route path="/forgot" element={<ForgotPassword />} />
       </Routes>
     </BrowserRouter>
   );
