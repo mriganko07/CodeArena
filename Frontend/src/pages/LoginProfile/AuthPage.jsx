@@ -186,14 +186,14 @@ function LoginForm() {
         <div>
           <div className="flex justify-between items-center mb-1.5">
             <label className="text-xs font-medium text-zinc-400 tracking-widest uppercase">
-            Password
+              Password
             </label>
 
             <a
-            href="#"
-            className="text-xs text-[#6C63FF] font-medium hover:text-[#8b85ff] transition-colors no-underline"
+              href="#"
+              className="text-xs text-[#6C63FF] font-medium hover:text-[#8b85ff] transition-colors no-underline"
             >
-            Forgot?
+              Forgot?
             </a>
           </div>
           <InputField
@@ -311,22 +311,22 @@ function SignupForm() {
         </div>
 
         <Checkbox checked={terms} onToggle={() => setTerms(!terms)}>
-            I agree to the{" "}
-            <a
+          I agree to the{" "}
+          <a
             href="#"
             className="text-[#6C63FF] no-underline hover:text-[#8b85ff]"
             onClick={(e) => e.stopPropagation()}
-            >
+          >
             Terms of Service
-            </a>{" "}
-            and{" "}
-            <a
-                href="#"
-                className="text-[#6C63FF] no-underline hover:text-[#8b85ff]"
-                onClick={(e) => e.stopPropagation()}
-            >
+          </a>{" "}
+          and{" "}
+          <a
+            href="#"
+            className="text-[#6C63FF] no-underline hover:text-[#8b85ff]"
+            onClick={(e) => e.stopPropagation()}
+          >
             Privacy Policy
-            </a>
+          </a>
         </Checkbox>
 
         <button
