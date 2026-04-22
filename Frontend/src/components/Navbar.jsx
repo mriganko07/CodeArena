@@ -2,9 +2,12 @@ import { MenuIcon, XIcon } from 'lucide-react';
 import { PrimaryButton } from './Buttons';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const { user, logout } = useAuth();
+
 
     const navLinks = [
         { name: 'Home', href: '/#' },
@@ -38,6 +41,20 @@ export default function Navbar() {
                         Sign in
                     </button>
                     <PrimaryButton className='max-sm:text-xs hidden sm:inline-block'>Get Started</PrimaryButton>
+                    <h1 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 700 }}>
+                        Welcome, {user?.firstName}! 👋
+                    </h1>
+                    <button
+                        onClick={logout}
+                        style={{
+                            width: "100%", padding: "12px", borderRadius: "12px",
+                            background: "linear-gradient(135deg, #6C63FF, #4f46e5)",
+                            color: "#fff", fontWeight: 600, fontSize: "14px",
+                            border: "none", cursor: "pointer"
+                        }}
+                    >
+                        Logout
+                    </button>
                 </div>
 
                 <button onClick={() => setIsOpen(!isOpen)} className='md:hidden'>

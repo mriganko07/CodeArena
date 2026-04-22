@@ -1,4 +1,8 @@
 import { useState } from "react";
+// import { login, signup, loginWithGoogle, validate2FA } from "../../hooks/useAuth.js";
+import { login as loginRequest, signup, loginWithGoogle, validate2FA } from "../../hooks/useAuth.js";
+// At the top of AuthPage.jsx — add this import
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const EyeIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -43,7 +47,8 @@ const CheckIcon = () => (
 
 // ─── Reusable Components ───────────────────────────────────────────────────────
 
-function InputField({ label, type = "text", placeholder, id, rightSlot, extraProps = {} }) {
+// NOW accepts value + onChange so it's actually controlled
+function InputField({ label, type = "text", placeholder, id, rightSlot, value, onChange }) {
   return (
     <div>
       {label && (
@@ -56,11 +61,12 @@ function InputField({ label, type = "text", placeholder, id, rightSlot, extraPro
           id={id}
           type={type}
           placeholder={placeholder}
+          value={value}
+          onChange={onChange}
           className="w-full px-3.5 py-2.5 rounded-xl text-sm text-white placeholder-zinc-600
             bg-[#050816cc] border border-[#2A1454] outline-none
             focus:border-[#6C63FF] focus:ring-2 focus:ring-[#6C63FF22]
             transition-all duration-200 font-[DM_Sans]"
-          {...extraProps}
         />
         {rightSlot}
       </div>
@@ -68,7 +74,7 @@ function InputField({ label, type = "text", placeholder, id, rightSlot, extraPro
   );
 }
 
-function Checkbox({ id, checked, onToggle, children }) {
+function Checkbox({ checked, onToggle, children }) {
   return (
     <div className="flex items-start gap-2 cursor-pointer" onClick={onToggle}>
       <div
@@ -83,9 +89,10 @@ function Checkbox({ id, checked, onToggle, children }) {
   );
 }
 
-function GoogleButton({ label }) {
+function GoogleButton({ label, onClick }) {
   return (
     <button
+      onClick={onClick}
       className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl text-sm
         text-white bg-[#1F2937] border border-[#2A1454]
         hover:border-[#6C63FF55] hover:bg-[#2A1454aa]
@@ -165,11 +172,111 @@ function StrengthMeter({ password }) {
   );
 }
 
+// ─── Alert Component ───────────────────────────────────────────────────────────
+
+function Alert({ type, message }) {
+  if (!message) return null;
+  const styles = {
+    error:   "bg-red-500/10 border-red-500/30 text-red-400",
+    success: "bg-green-500/10 border-green-500/30 text-green-400",
+  };
+  return (
+    <div className={`text-xs px-3.5 py-2.5 rounded-xl border ${styles[type]}`}>
+      {message}
+    </div>
+  );
+}
+
 // ─── Login Form ────────────────────────────────────────────────────────────────
 
 function LoginForm() {
-  const [showPass, setShowPass] = useState(false);
-  const [remember, setRemember] = useState(false);
+  const [showPass, setShowPass]     = useState(false);
+  const [remember, setRemember]     = useState(false);
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [error, setError]           = useState("");
+  const [loading, setLoading]       = useState(false);
+  // 2FA
+  const [show2FA, setShow2FA]           = useState(false);
+  const [preAuthToken, setPreAuthToken] = useState("");
+  const [totpCode, setTotpCode]         = useState("");
+  const { login } = useAuth(); 
+
+
+
+  const handleLogin = async () => {
+    if (!email || !password) return setError("Please fill in all fields.");
+    setError(""); setLoading(true);
+    try {
+      const data = await loginRequest({ email, password }); // your useAuth.js function
+      if (data.twoFactorRequired) {
+        setPreAuthToken(data.preAuthToken);
+        setShow2FA(true);
+      } else {
+        login(data.user, data.token);  // ← sets user in context + localStorage
+        window.location.href = "/dashboard";
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handle2FASubmit = async () => {
+    if (!totpCode) return setError("Please enter your authenticator code.");
+    setError(""); setLoading(true);
+    try {
+      const data = await validate2FA({ preAuthToken, token: totpCode });
+      login(data.user, data.token);  // ← same here
+      window.location.href = "/dashboard";
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── 2FA Step UI ──
+  if (show2FA) {
+    return (
+      <div className="animate-[fadeSlideIn_0.3s_ease]">
+        <h2 className="text-xl font-bold text-white mb-1 font-[Syne]">Two-Factor Auth</h2>
+        <p className="text-zinc-400 text-[13px] mb-6">
+          Enter the 6-digit code from your Google Authenticator app.
+        </p>
+        <div className="flex flex-col gap-3.5">
+          <InputField
+            label="Authenticator Code"
+            type="text"
+            placeholder="000000"
+            value={totpCode}
+            onChange={(e) => setTotpCode(e.target.value)}
+          />
+          <Alert type="error" message={error} />
+          <button
+            onClick={handle2FASubmit}
+            disabled={loading}
+            className="w-full py-3 rounded-xl text-[15px] font-semibold text-white mt-1
+              bg-gradient-to-br from-[#6C63FF] to-[#4f46e5]
+              shadow-[0_4px_24px_#6C63FF44]
+              hover:-translate-y-0.5 hover:shadow-[0_8px_32px_#6C63FF55]
+              active:scale-[0.98] transition-all duration-150
+              border-none cursor-pointer font-[Syne] tracking-wide
+              disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+          >
+            {loading ? "Verifying..." : "Verify →"}
+          </button>
+          <button
+            onClick={() => { setShow2FA(false); setError(""); setTotpCode(""); }}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors bg-transparent border-none cursor-pointer"
+          >
+            ← Back to login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-[fadeSlideIn_0.3s_ease]">
@@ -177,12 +284,16 @@ function LoginForm() {
       <p className="text-zinc-400 text-[13px] mb-6">Sign in to your account</p>
 
       <div className="flex flex-col gap-3.5">
+        {/* ── Email ── */}
         <InputField
           label="Email Address"
           type="email"
           placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
         />
 
+        {/* ── Password ── */}
         <div>
           <div className="flex justify-between items-center mb-1.5">
             <label className="text-xs font-medium text-zinc-400 tracking-widest uppercase">
@@ -190,7 +301,7 @@ function LoginForm() {
             </label>
 
             <a
-              href="#"
+              href="/forgot"
               className="text-xs text-[#6C63FF] font-medium hover:text-[#8b85ff] transition-colors no-underline"
             >
               Forgot?
@@ -199,6 +310,8 @@ function LoginForm() {
           <InputField
             type={showPass ? "text" : "password"}
             placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             rightSlot={
               <EyeToggle show={showPass} onToggle={() => setShowPass(!showPass)} />
             }
@@ -206,24 +319,31 @@ function LoginForm() {
         </div>
 
         <Checkbox checked={remember} onToggle={() => setRemember(!remember)}>
-          Remember me for 30 days
+          Remember me
         </Checkbox>
 
+        {/* ── Error ── */}
+        <Alert type="error" message={error} />
+
+        {/* ── Submit ── */}
         <button
+          onClick={handleLogin}
+          disabled={loading}
           className="w-full py-3 rounded-xl text-[15px] font-semibold text-white mt-1
             bg-gradient-to-br from-[#6C63FF] to-[#4f46e5]
             shadow-[0_4px_24px_#6C63FF44]
             hover:-translate-y-0.5 hover:shadow-[0_8px_32px_#6C63FF55]
             active:scale-[0.98] transition-all duration-150
-            border-none cursor-pointer font-[Syne] tracking-wide"
+            border-none cursor-pointer font-[Syne] tracking-wide
+            disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
         >
-          Sign In →
+          {loading ? "Signing in..." : "Sign In →"}
         </button>
 
         <Divider text="or continue with" />
-        <GoogleButton label="Continue with Google" />
+        <GoogleButton label="Continue with Google" onClick={loginWithGoogle} />
 
-        {/* 2FA Hint */}
+        {/* ── 2FA Hint ── */}
         <div className="flex items-center gap-2.5 bg-[#6C63FF0d] border border-[#6C63FF22] rounded-xl p-3">
           <LockIcon />
           <div>
@@ -241,33 +361,70 @@ function LoginForm() {
 // ─── Signup Form ───────────────────────────────────────────────────────────────
 
 function SignupForm() {
-  const [showPass, setShowPass] = useState(false);
-  const [password, setPassword] = useState("");
-  const [terms, setTerms] = useState(false);
+  const [showPass, setShowPass]   = useState(false);
+  const [terms, setTerms]         = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName]   = useState("");
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [error, setError]         = useState("");
+  const [success, setSuccess]     = useState("");
+  const [loading, setLoading]     = useState(false);
+
+  const handleSignup = async () => {
+    if (!firstName || !lastName || !email || !password)
+      return setError("Please fill in all fields.");
+    if (!terms)
+      return setError("Please accept the Terms of Service to continue.");
+    setError(""); setSuccess(""); setLoading(true);
+    try {
+      const data = await signup({ firstName, lastName, email, password });
+      setSuccess(data.message);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="animate-[fadeSlideIn_0.3s_ease]">
       <div className="flex items-center gap-2 mb-1">
         <h2 className="text-xl font-bold text-white font-[Syne]">Create account</h2>
-        <span
-          className="text-[10px] font-semibold text-[#6C63FF] tracking-widest
-            px-2 py-0.5 rounded-full border border-[#6C63FF44] bg-[#6C63FF22] font-[Syne]"
-        >
+        <span className="text-[10px] font-semibold text-[#6C63FF] tracking-widest
+          px-2 py-0.5 rounded-full border border-[#6C63FF44] bg-[#6C63FF22] font-[Syne]">
           FREE
         </span>
       </div>
       <p className="text-zinc-400 text-[13px] mb-6">Join thousands of users today</p>
 
       <div className="flex flex-col gap-3.5">
-        {/* Name Row */}
+        {/* ── Name Row ── */}
         <div className="grid grid-cols-2 gap-3">
-          <InputField label="First Name" placeholder="John" />
-          <InputField label="Last Name" placeholder="Doe" />
+          <InputField
+            label="First Name"
+            placeholder="John"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+          />
+          <InputField
+            label="Last Name"
+            placeholder="Doe"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+          />
         </div>
 
-        <InputField label="Email Address" type="email" placeholder="you@example.com" />
+        {/* ── Email ── */}
+        <InputField
+          label="Email Address"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-        {/* Password + Strength */}
+        {/* ── Password + Strength ── */}
         <div>
           <label className="block text-xs font-medium text-zinc-400 mb-1.5 tracking-widest uppercase">
             Password
@@ -288,7 +445,7 @@ function SignupForm() {
           <StrengthMeter password={password} />
         </div>
 
-        {/* 2FA Setup Banner */}
+        {/* ── 2FA Banner ── */}
         <div className="bg-[#22C55E0d] border border-[#22C55E22] rounded-xl p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -297,10 +454,7 @@ function SignupForm() {
                 Two-Factor Auth (2FA)
               </span>
             </div>
-            <span
-              className="text-[10px] font-semibold text-[#22C55E]
-                bg-[#22C55E22] rounded-full px-2 py-0.5"
-            >
+            <span className="text-[10px] font-semibold text-[#22C55E] bg-[#22C55E22] rounded-full px-2 py-0.5">
               RECOMMENDED
             </span>
           </div>
@@ -310,38 +464,41 @@ function SignupForm() {
           </p>
         </div>
 
+        {/* ── Terms ── */}
         <Checkbox checked={terms} onToggle={() => setTerms(!terms)}>
           I agree to the{" "}
-          <a
-            href="#"
-            className="text-[#6C63FF] no-underline hover:text-[#8b85ff]"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <a href="#" className="text-[#6C63FF] no-underline hover:text-[#8b85ff]"
+            onClick={(e) => e.stopPropagation()}>
             Terms of Service
           </a>{" "}
           and{" "}
-          <a
-            href="#"
-            className="text-[#6C63FF] no-underline hover:text-[#8b85ff]"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <a href="#" className="text-[#6C63FF] no-underline hover:text-[#8b85ff]"
+            onClick={(e) => e.stopPropagation()}>
             Privacy Policy
           </a>
         </Checkbox>
 
+        {/* ── Error / Success ── */}
+        <Alert type="error"   message={error} />
+        <Alert type="success" message={success} />
+
+        {/* ── Submit ── */}
         <button
+          onClick={handleSignup}
+          disabled={loading || !!success}
           className="w-full py-3 rounded-xl text-[15px] font-semibold text-white mt-1
             bg-gradient-to-br from-[#6C63FF] to-[#4f46e5]
             shadow-[0_4px_24px_#6C63FF44]
             hover:-translate-y-0.5 hover:shadow-[0_8px_32px_#6C63FF55]
             active:scale-[0.98] transition-all duration-150
-            border-none cursor-pointer font-[Syne] tracking-wide"
+            border-none cursor-pointer font-[Syne] tracking-wide
+            disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
         >
-          Create Account →
+          {loading ? "Creating account..." : success ? "Check your email ✓" : "Create Account →"}
         </button>
 
         <Divider text="or sign up with" />
-        <GoogleButton label="Continue with Google" />
+        <GoogleButton label="Continue with Google" onClick={loginWithGoogle} />
       </div>
     </div>
   );
@@ -357,7 +514,6 @@ export default function AuthPage() {
       className="relative min-h-screen flex items-center justify-center px-6 py-8 overflow-x-hidden"
       style={{ background: "#050816", fontFamily: "'DM Sans', sans-serif" }}
     >
-      {/* Google Fonts */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
         @keyframes fadeSlideIn {
@@ -367,53 +523,23 @@ export default function AuthPage() {
       `}</style>
 
       {/* Background Orbs */}
-      <div
-        className="fixed rounded-full pointer-events-none z-0"
-        style={{
-          width: 420, height: 420,
-          background: "#2A1454",
-          top: -80, left: -100,
-          opacity: 0.7,
-          filter: "blur(80px)",
-        }}
-      />
-      <div
-        className="fixed rounded-full pointer-events-none z-0"
-        style={{
-          width: 300, height: 300,
-          background: "#6C63FF22",
-          bottom: 40, right: -60,
-          opacity: 0.5,
-          filter: "blur(80px)",
-        }}
-      />
-      <div
-        className="fixed rounded-full pointer-events-none z-0"
-        style={{
-          width: 200, height: 200,
-          background: "#6C63FF18",
-          top: "40%", left: "50%",
-          opacity: 0.4,
-          filter: "blur(80px)",
-        }}
-      />
+      <div className="fixed rounded-full pointer-events-none z-0"
+        style={{ width: 420, height: 420, background: "#2A1454", top: -80, left: -100, opacity: 0.7, filter: "blur(80px)" }} />
+      <div className="fixed rounded-full pointer-events-none z-0"
+        style={{ width: 300, height: 300, background: "#6C63FF22", bottom: 40, right: -60, opacity: 0.5, filter: "blur(80px)" }} />
+      <div className="fixed rounded-full pointer-events-none z-0"
+        style={{ width: 200, height: 200, background: "#6C63FF18", top: "40%", left: "50%", opacity: 0.4, filter: "blur(80px)" }} />
 
-      {/* Content */}
       <div className="relative z-10 w-full max-w-[440px]">
-
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2.5 mb-2">
-            <div
-              className="w-9 h-9 rounded-[10px] flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #6C63FF, #2A1454)" }}
-            >
+            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #6C63FF, #2A1454)" }}>
               <LogoIcon />
             </div>
-            <h1
-              className="text-[22px] font-extrabold tracking-tight text-white"
-              style={{ fontFamily: "'Syne', sans-serif" }}
-            >
+            <h1 className="text-[22px] font-extrabold tracking-tight text-white"
+              style={{ fontFamily: "'Syne', sans-serif" }}>
               CodeArena
             </h1>
           </div>
@@ -421,47 +547,31 @@ export default function AuthPage() {
         </div>
 
         {/* Card */}
-        <div
-          className="rounded-[20px] p-8 border border-[#6C63FF33]"
+        <div className="rounded-[20px] p-8 border border-[#6C63FF33]"
           style={{
             background: "linear-gradient(135deg, #1F2937ee 0%, #1A0B2E99 100%)",
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
-          }}
-        >
+          }}>
           {/* Tab Switcher */}
-          <div
-            className="flex gap-1.5 rounded-xl p-1 mb-7 border border-[#2A1454]"
-            style={{ background: "#05081699" }}
-          >
+          <div className="flex gap-1.5 rounded-xl p-1 mb-7 border border-[#2A1454]"
+            style={{ background: "#05081699" }}>
             {["login", "signup"].map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={`flex-1 py-2 rounded-[9px] text-sm font-semibold border-none cursor-pointer
                   transition-all duration-200
-                  ${tab === t
-                    ? "text-white shadow-[0_0_20px_#6C63FF55]"
-                    : "text-zinc-400 bg-transparent"
-                  }`}
-                style={{
-                  fontFamily: "'Syne', sans-serif",
-                  background: tab === t ? "#6C63FF" : "transparent",
-                }}
+                  ${tab === t ? "text-white shadow-[0_0_20px_#6C63FF55]" : "text-zinc-400 bg-transparent"}`}
+                style={{ fontFamily: "'Syne', sans-serif", background: tab === t ? "#6C63FF" : "transparent" }}
               >
                 {t === "login" ? "Sign In" : "Sign Up"}
               </button>
             ))}
           </div>
 
-          {/* Forms */}
           {tab === "login" ? <LoginForm /> : <SignupForm />}
         </div>
-
-        {/* Footer */}
-        {/* <p className="text-center text-[12px] text-zinc-700 mt-5">
-          Protected by 256-bit AES encryption · SOC2 Compliant
-        </p> */}
       </div>
     </div>
   );
