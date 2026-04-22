@@ -6,7 +6,7 @@ import Header from "../../components/Header";
 import DriveCard from "../../components/DriveCard";
 import DateTime from "../../components/DateTime";
 import { motion } from "framer-motion";
-
+import { useAuth } from "../../context/AuthContext";
 
 const pastDrives = [
     {
@@ -27,18 +27,19 @@ const pastDrives = [
         date: "Dec 15, 2025",
         status: "Pending",
     },
-    
 ];
 
 const DrivePreview = () => {
+    const { user } = useAuth();
+    
+    const fullName = user ? `${user.firstName} ${user.lastName}` : "User";
+
     return (
         <>
             <SoftBackdrop />
             <LenisScroll />
-            {/* <Navbar /> */}
 
             <Header />
-
 
             <motion.div
                 className="p-6 max-w-5xl mx-auto"
@@ -49,11 +50,10 @@ const DrivePreview = () => {
                 <DateTime />
 
                 <h1 className="text-3xl font-bold mb-10 bg-gradient-to-r from-indigo-500 via-indigo-400 to-indigo-300 bg-clip-text text-transparent">
-                    Welcome, Adhip Halder
+                    Welcome, {fullName}
                 </h1>
 
                 <div className="text-gray-300 text-sm font-medium mb-4">
-
                     PAST DRIVES
                 </div>
 

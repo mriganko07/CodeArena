@@ -7,11 +7,12 @@ import rateLimit from "express-rate-limit";
 import connectDB from "./lib/db.js";
 
 import authRoutes from "./routes/auth.js";
-import googleRoutes, { initGoogleStrategy } from "./routes/google.js";  // ← updated
+import googleRoutes, { initGoogleStrategy } from "./routes/google.js";
 import twoFactorRoutes from "./routes/twoFactor.js";
+import adminRoutes from "./routes/admin.js";
 
-dotenv.config();          // ← loads .env first
-initGoogleStrategy();     // ← NOW process.env values are available
+dotenv.config();
+initGoogleStrategy();
 connectDB();
 
 const app = express();
@@ -19,6 +20,7 @@ const app = express();
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
+
 
 app.use(
   session({
@@ -41,13 +43,14 @@ app.use(passport.session());
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === "production" ? 20 : 1000, // unlimited in dev
+  max: process.env.NODE_ENV === "production" ? 20 : 1000, 
   message: { success: false, message: "Too many requests. Please try again later." },
 });
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/auth/google", googleRoutes);
 app.use("/api/2fa", authLimiter, twoFactorRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => res.json({ status: "API is running 🚀" }));
 app.get("/api/test", (req, res) => res.json({ message: "Frontend + Backend Connected" }));
