@@ -6,7 +6,7 @@ import InterviewPanel from "./pages/InterView/InterviewPanel";
 import PythonPracticeApp from "./pages/Prcaticeset/PythonPracticeApp";
 import DomainSelectorPage from "./pages/Prcaticeset/DomainSelectorPage";
 import PracticeSetPage from "./pages/Prcaticeset/PracticeSetPage";
-import Dashboard from "./pages/Dashboard/Dashboard";
+// import Dashboard from "./pages/Dashboard/Dashboard";
 import ProfileDashboard from "./pages/LoginProfile/ProfileDashboard";
 import AuthPage from "./pages/LoginProfile/AuthPage";
 import ForgotPassword from "./pages/LoginProfile/ForgotPassword";
@@ -22,7 +22,7 @@ import SignUp from "./pages/SignUp/SignUp";
 
 
 import { useAuth } from "./context/AuthContext.jsx";
-// import Dashboard from "./pages/Dashboard.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
 import AuthCallback from "./pages/AuthCallback.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -50,7 +50,7 @@ function App() {
       <Route path="/interviewPanel" element={<InterviewPanel />} />
       <Route path="/practiceset" element={<PythonPracticeApp />} />
       <Route path="/domainselector" element={<DomainSelectorPage />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      {/* <Route path="/dashboard" element={<Dashboard />} /> */}
       <Route path="/profile" element={<ProfileDashboard />} />
       <Route path="/login" element={<AuthPage />} />
       <Route path="/forgot" element={<ForgotPassword />} />
@@ -58,14 +58,14 @@ function App() {
       <Route path="/admin" element={<AdminDashboard />} />
 
       {/* Protected routes */}
-      {/* <Route
+      <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>
         }
-      /> */}
+      />
 
       {/* Default redirect */}
       <Route
