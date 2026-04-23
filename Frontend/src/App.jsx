@@ -46,7 +46,7 @@ function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/verify-email/:token" element={<VerifyEmail />} />
       <Route path="/" element={<Home />} />
-      <Route path="/drive_name" element={<DrivePreview />} />
+      <Route path="/drive" element={<DrivePreview />} />
       <Route path="/interviewPanel" element={<InterviewPanel />} />
       <Route path="/practiceset" element={<PythonPracticeApp />} />
       <Route path="/domainselector" element={<DomainSelectorPage />} />
