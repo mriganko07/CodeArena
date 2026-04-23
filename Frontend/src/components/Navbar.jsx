@@ -3,6 +3,7 @@ import { PrimaryButton } from './Buttons';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from "../context/AuthContext.jsx";
+import { NavLink } from "react-router-dom";
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
@@ -36,25 +37,35 @@ export default function Navbar() {
                     ))}
                 </div>
 
-                <div className='hidden md:flex items-center gap-3'>
-                    <button className='text-sm font-medium text-gray-300 hover:text-white transition max-sm:hidden'>
-                        Sign in
-                    </button>
-                    <PrimaryButton className='max-sm:text-xs hidden sm:inline-block'>Get Started</PrimaryButton>
-                    <h1 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 700 }}>
-                        Welcome, {user?.firstName}! 👋
-                    </h1>
-                    <button
-                        onClick={logout}
-                        style={{
-                            width: "100%", padding: "12px", borderRadius: "12px",
-                            background: "linear-gradient(135deg, #6C63FF, #4f46e5)",
-                            color: "#fff", fontWeight: 600, fontSize: "14px",
-                            border: "none", cursor: "pointer"
-                        }}
-                    >
-                        Logout
-                    </button>
+                <div className="hidden md:flex items-center gap-3">
+
+                    {user ? (
+                        <>
+                            <PrimaryButton className="max-sm:text-xs hidden sm:inline-block">
+                                Welcome, {user?.firstName}
+                            </PrimaryButton>
+
+                            <button
+                                onClick={logout}
+                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#6C63FF] to-[#4f46e5] text-white text-sm font-semibold"
+                            >
+                                Logout
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <NavLink to="/login" className="text-sm font-medium text-gray-300 hover:text-white transition">
+                                Sign in
+                            </NavLink>
+
+                            <NavLink to="/signup">
+                                <PrimaryButton className="max-sm:text-xs hidden sm:inline-block">
+                                    Get Started
+                                </PrimaryButton>
+                            </NavLink>
+                        </>
+                    )}
+
                 </div>
 
                 <button onClick={() => setIsOpen(!isOpen)} className='md:hidden'>
