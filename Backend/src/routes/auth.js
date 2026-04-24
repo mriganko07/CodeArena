@@ -4,8 +4,12 @@ import crypto from "crypto";
 import { body, validationResult } from "express-validator";
 import User from "../models/User.js";
 import { protect } from "../middleware/auth.js";
-import { sendEmail, verificationEmailHTML } from "../utils/sendEmail.js";
 import axios from "axios";
+import { verifyOtp } from "../controllers/auth.js";
+
+import OTP from "../models/OTP.js";
+import { sendEmail, verificationEmailHTML, otpEmailHTML } from "../utils/sendEmail.js";
+import bcrypt from "bcrypt";
 
 const router = express.Router();
 
@@ -143,18 +147,38 @@ router.post(
           message: "Please verify your email before logging in.",
         });
 
-      if (user.twoFactorEnabled) {
-        const preAuthToken = jwt.sign(
-          { id: user._id, twoFactorPending: true },
-          process.env.JWT_SECRET,
-          { expiresIn: "10m" }
-        );
-        return res.status(200).json({
-          success: true,
-          twoFactorRequired: true,
-          preAuthToken,
-        });
-      }
+        if (user.twoFactorEnabled) {
+          const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        
+          await OTP.deleteMany({ email: user.email });
+        
+          const hashedOtp = await bcrypt.hash(otp, 10);
+        
+          await OTP.create({
+            email: user.email,
+            otp: hashedOtp,
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+          });
+        
+          await sendEmail({
+            to: email,
+            subject: "Your OTP Code",
+            html: otpEmailHTML(otp),
+          });
+        
+          const preAuthToken = jwt.sign(
+            { id: user._id, twoFactorPending: true },
+            process.env.JWT_SECRET,
+            { expiresIn: "10m" }
+          );
+        
+          return res.status(200).json({
+            success: true,
+            twoFactorRequired: true,
+            preAuthToken,
+            email: user.email, 
+          });
+        }
 
       sendTokenResponse(user, 200, res);
     } catch (error) {
@@ -213,6 +237,18 @@ router.get("/me", protect, async (req, res) => {
 // ── POST /api/auth/logout ─────────────────────────────────────────────────────
 router.post("/logout", protect, (req, res) => {
   res.status(200).json({ success: true, message: "Logged out successfully." });
+});
+
+
+router.post("/verify-otp", verifyOtp);
+
+
+// ── ENABLE 2FA ─────────────────────────────
+router.post("/enable-2fa", protect, async (req, res) => {
+  req.user.twoFactorEnabled = true;
+  await req.user.save();
+
+  res.json({ success: true, message: "2FA enabled" });
 });
 
 export default router;

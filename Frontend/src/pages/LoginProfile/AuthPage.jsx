@@ -210,12 +210,13 @@ function LoginForm() {
     if (!email || !password) return setError("Please fill in all fields.");
     setError(""); setLoading(true);
     try {
-      const data = await loginRequest({ email, password }); // your useAuth.js function
+      const data = await loginRequest({ email, password }); 
       if (data.twoFactorRequired) {
         setPreAuthToken(data.preAuthToken);
+        setEmail(data.email); 
         setShow2FA(true);
       } else {
-        login(data.user, data.token);  // ← sets user in context + localStorage
+        login(data.user, data.token);
         window.location.href = "/dashboard";
       }
     } catch (err) {
@@ -226,14 +227,32 @@ function LoginForm() {
   };
 
   const handle2FASubmit = async () => {
-    if (!totpCode) return setError("Please enter your authenticator code.");
-    setError(""); setLoading(true);
     try {
-      const data = await validate2FA({ preAuthToken, token: totpCode });
-      login(data.user, data.token);  // ← same here
-      window.location.href = "/dashboard";
+      setLoading(true);
+  
+      const res = await fetch("http://localhost:4000/api/auth/verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          otp: totpCode,
+        }),
+      });
+  
+      const data = await res.json();
+  
+      if (data.success) {
+        login(data.user, data.token); // ✅ FIXED
+        window.location.href = "/dashboard";
+      } else {
+        setError(data.message);
+      }
+  
     } catch (err) {
-      setError(err.message);
+      console.log(err);
+      setError("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -243,22 +262,32 @@ function LoginForm() {
   if (show2FA) {
     return (
       <div className="animate-[fadeSlideIn_0.3s_ease]">
-        <h2 className="text-xl font-bold text-white mb-1 font-[Syne]">Two-Factor Auth</h2>
+        <h2 className="text-xl font-bold text-white mb-1 font-[Syne]">
+          Two-Factor Auth
+        </h2>
+  
         <p className="text-zinc-400 text-[13px] mb-6">
-          Enter the 6-digit code from your Google Authenticator app.
+          Enter the 6-digit code sent to your email.
         </p>
+  
         <div className="flex flex-col gap-3.5">
+  
+          {/* ✅ INPUT HERE */}
           <InputField
-            label="Authenticator Code"
+            label="OTP Code"
             type="text"
             placeholder="000000"
             value={totpCode}
             onChange={(e) => setTotpCode(e.target.value)}
           />
+  
+          {/* Error */}
           <Alert type="error" message={error} />
+  
+          {/* ✅ BUTTON HERE */}
           <button
             onClick={handle2FASubmit}
-            disabled={loading}
+            disabled={loading || !totpCode}
             className="w-full py-3 rounded-xl text-[15px] font-semibold text-white mt-1
               bg-gradient-to-br from-[#6C63FF] to-[#4f46e5]
               shadow-[0_4px_24px_#6C63FF44]
@@ -269,12 +298,19 @@ function LoginForm() {
           >
             {loading ? "Verifying..." : "Verify →"}
           </button>
+  
+          {/* Back button */}
           <button
-            onClick={() => { setShow2FA(false); setError(""); setTotpCode(""); }}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors bg-transparent border-none cursor-pointer"
+            onClick={() => {
+              setShow2FA(false);
+              setError("");
+              setTotpCode("");
+            }}
+            className="text-xs text-zinc-500 hover:text-zinc-300"
           >
             ← Back to login
           </button>
+  
         </div>
       </div>
     );

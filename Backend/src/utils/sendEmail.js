@@ -48,3 +48,31 @@ export const verificationEmailHTML = (firstName, verifyURL) => `
     </div>
   </div>
 `;
+
+export const otpEmailHTML = (otp) => `
+  <div style="font-family: 'Segoe UI', sans-serif; max-width: 520px; margin: auto;
+              background: #0d0d1a; color: #fff; border-radius: 16px; overflow: hidden;">
+    
+    <div style="background: linear-gradient(135deg, #FF6B6B, #C44569);
+                padding: 32px; text-align: center;">
+      <h1 style="margin: 0; font-size: 24px;">CodeArena</h1>
+      <p style="margin-top: 8px; opacity: 0.8;">Your OTP Code</p>
+    </div>
+
+    <div style="padding: 32px; text-align: center;">
+      <p style="font-size: 16px;">Use this OTP to continue:</p>
+      
+      <h2 style="font-size: 32px; letter-spacing: 4px; margin: 20px 0;">
+        ${otp}
+      </h2>
+
+      <p style="color: #a1a1aa;">
+        This OTP will expire in <strong style="color: #fff;">5 minutes</strong>.
+      </p>
+
+      <p style="color: #52525b; font-size: 12px; margin-top: 30px;">
+        Do not share this code with anyone.
+      </p>
+    </div>
+  </div>
+`;
