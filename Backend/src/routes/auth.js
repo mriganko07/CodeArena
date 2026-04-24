@@ -105,7 +105,6 @@ router.get("/verify-email/:token", async (req, res) => {
         message: "Token is invalid or has expired.",
       });
 
-    // ✅ This was commented out — fixed
     user.isVerified = true;
     user.emailVerifyToken = undefined;
     user.emailVerifyExpires = undefined;
@@ -190,11 +189,11 @@ router.post("/google", async (req, res) => {
         lastName: family_name,
         email,
         googleId: sub,
-        picture: picture || "",   // ensure value
+        picture: picture || "",   
         isVerified: true,
       });
     } else {
-      user.picture = picture || user.picture; // don't overwrite with empty
+      user.picture = picture || user.picture; 
       user.googleId = sub;
       await user.save();
     }
