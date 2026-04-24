@@ -183,6 +183,7 @@ const DrivesTable = ({ drives, onDelete }) => (
   <table className="w-full text-sm text-left">
     <thead className="text-xs text-indigo-300 uppercase bg-black/40">
       <tr>
+        <th className="px-6 py-4">Drive ID</th>
         <th className="px-6 py-4">Position Name</th>
         <th className="px-6 py-4">Date</th>
         <th className="px-6 py-4">Type</th>
@@ -194,6 +195,7 @@ const DrivesTable = ({ drives, onDelete }) => (
     <tbody className="divide-y divide-white/10">
       {drives.map((d) => (
         <tr key={d._id} className="hover:bg-white/5 transition-colors">
+          <td className="px-6 py-4 font-mono font-bold text-indigo-400">{d.driveId}</td>
           <td className="px-6 py-4 font-semibold">{d.hiringPositionName}</td>
           <td className="px-6 py-4 text-slate-300">{new Date(d.driveDate).toLocaleDateString()}</td>
           <td className="px-6 py-4 uppercase text-xs font-bold text-slate-400">{d.driveType}</td>
@@ -214,7 +216,8 @@ const InterviewsTable = ({ interviews, onEdit }) => (
   <table className="w-full text-sm text-left">
     <thead className="text-xs text-indigo-300 uppercase bg-black/40">
       <tr>
-        <th className="px-6 py-4">Drive Name</th>
+        <th className="px-6 py-4">Drive ID</th>
+        <th className="px-6 py-4">Position Name</th>
         <th className="px-6 py-4">Drive Date</th>
         <th className="px-6 py-4 w-1/2">Enrolled Users</th>
         <th className="px-6 py-4 text-right">Actions</th>
@@ -223,6 +226,7 @@ const InterviewsTable = ({ interviews, onEdit }) => (
     <tbody className="divide-y divide-white/10">
       {interviews.map((i) => (
         <tr key={i._id} className="hover:bg-white/5 transition-colors">
+          <td className="px-6 py-4 font-mono font-bold text-indigo-400">{i.driveId?.driveId || "N/A"}</td>
           <td className="px-6 py-4 font-semibold">{i.driveId?.hiringPositionName || "N/A"}</td>
           <td className="px-6 py-4 text-slate-300">{i.driveId ? new Date(i.driveId.driveDate).toLocaleDateString() : "N/A"}</td>
           <td className="px-6 py-4">
@@ -250,7 +254,8 @@ const ResultsTable = ({ results }) => (
     <thead className="text-xs text-indigo-300 uppercase bg-black/40">
       <tr>
         <th className="px-6 py-4">Candidate</th>
-        <th className="px-6 py-4">Drive Position</th>
+        <th className="px-6 py-4">Drive ID</th>
+        <th className="px-6 py-4">Position Name</th>
         <th className="px-6 py-4 text-center">Score</th>
         <th className="px-6 py-4 text-center">Status</th>
         <th className="px-6 py-4 text-center">Result</th>
@@ -264,6 +269,7 @@ const ResultsTable = ({ results }) => (
         return (
           <tr key={r._id} className="hover:bg-white/5 transition-colors">
             <td className="px-6 py-4 font-semibold">{r.userId?.firstName} {r.userId?.lastName}</td>
+            <td className="px-6 py-4 font-mono font-bold text-indigo-400">{r.driveId?.driveId}</td>
             <td className="px-6 py-4 text-slate-300">{r.driveId?.hiringPositionName}</td>
             <td className="px-6 py-4 text-center font-mono">{r.score} / {r.driveId?.totalMarks || 0}</td>
             <td className="px-6 py-4 text-center">
@@ -293,15 +299,30 @@ const DriveModal = ({ onClose, onSuccess, token }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...formData,
+        timeDurationInMin: Number(formData.timeDurationInMin),
+        numberOfQuestions: Number(formData.numberOfQuestions),
+        marksPerQuestion: Number(formData.marksPerQuestion),
+      };
+
       const res = await fetch(`${API_URL}/drives`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
-      if (res.ok) onSuccess();
-      else alert("Failed to create drive");
+
+      const data = await res.json();
+
+      if (res.ok) {
+        onSuccess();
+      } else {
+        alert(`Failed to create drive: ${data.message}`);
+        console.error("Backend Error:", data);
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Network/Fetch Error:", error);
+      alert("A network or server error occurred. Check console.");
     }
   };
 
@@ -433,7 +454,10 @@ const InterviewModal = ({ onClose, onSuccess, token }) => {
                     }`}
                   >
                     <div>
-                      <div className="font-bold text-white text-lg">{d.hiringPositionName}</div>
+                      <div className="font-bold text-white text-lg">
+                        <span className="text-indigo-400 mr-2 font-mono">[{d.driveId}]</span>
+                        {d.hiringPositionName}
+                      </div>
                       <div className="text-xs text-slate-400 mt-1 flex gap-3">
                         <span>📅 {new Date(d.driveDate).toLocaleDateString()}</span>
                         <span>⏱ {d.timeDurationInMin}m</span>
@@ -513,7 +537,6 @@ const EditInterviewModal = ({ interview, onClose, onSuccess, token }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Initialize with the currently enrolled users
   const [selectedUsers, setSelectedUsers] = useState(
     interview.userIds.map(u => u._id)
   );
@@ -562,7 +585,9 @@ const EditInterviewModal = ({ interview, onClose, onSuccess, token }) => {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h3 className="text-xl font-bold text-white">Edit Enrolled Users</h3>
-            <p className="text-sm text-indigo-400 mt-1">{interview.driveId?.hiringPositionName}</p>
+            <p className="text-sm text-indigo-400 mt-1">
+              <span className="font-mono">[{interview.driveId?.driveId}]</span> {interview.driveId?.hiringPositionName}
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={20} /></button>
         </div>

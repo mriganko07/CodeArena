@@ -26,7 +26,21 @@ router.get("/drives", async (req, res) => {
 
 router.post("/drives", async (req, res) => {
   try {
-    const newDrive = await Drive.create(req.body);
+    let isUnique = false;
+    let driveId;
+    
+    while (!isUnique) {
+      driveId = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      const existingDrive = await Drive.findOne({ driveId });
+      if (!existingDrive) {
+        isUnique = true;
+      }
+    }
+
+    const driveData = { ...req.body, driveId };
+
+    const newDrive = await Drive.create(driveData);
     res.status(201).json({ success: true, data: newDrive });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -45,7 +59,7 @@ router.delete("/drives/:id", async (req, res) => {
 router.get("/interviews", async (req, res) => {
   try {
     const interviews = await Interview.find()
-      .populate("driveId", "hiringPositionName driveDate")
+      .populate("driveId", "driveId hiringPositionName driveDate")
       .populate("userIds", "firstName lastName email")
       .sort({ createdAt: -1 });
     res.json({ success: true, data: interviews });
@@ -85,7 +99,7 @@ router.get("/results", async (req, res) => {
   try {
     const results = await InterviewResult.find()
       .populate("userId", "firstName lastName email")
-      .populate("driveId", "hiringPositionName totalMarks")
+      .populate("driveId", "driveId hiringPositionName totalMarks")
       .sort({ createdAt: -1 });
     res.json({ success: true, data: results });
   } catch (error) {
