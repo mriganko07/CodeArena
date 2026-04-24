@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import SoftBackdropNew from "../../components/SoftBackdropNew";
+import LenisScroll from "../../components/lenis";
 
 const groups = [
   {
@@ -86,6 +88,127 @@ const groups = [
 
 const totalTopics = groups.reduce((sum, g) => sum + g.domains.length, 0);
 
+// Inline styles for glassmorphism (works regardless of Tailwind version)
+const glass = {
+  section: {
+    background: "rgba(255, 255, 255, 0.03)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    borderRadius: "22px",
+    padding: "24px",
+  },
+  card: {
+    background: "rgba(255, 255, 255, 0.04)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    border: "1px solid rgba(255, 255, 255, 0.09)",
+    borderRadius: "16px",
+  },
+  cardHover: {
+    background: "rgba(108, 99, 255, 0.08)",
+    border: "1px solid rgba(108, 99, 255, 0.4)",
+  },
+  headerCard: {
+    background: "rgba(255, 255, 255, 0.04)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    borderRadius: "24px",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)",
+  },
+};
+
+function DomainCard({ domain, category, active, onClick }) {
+  const [hovered, setHovered] = React.useState(false);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        ...glass.card,
+        ...(hovered || active ? glass.cardHover : {}),
+        transform: hovered ? "translateY(-4px)" : "translateY(0)",
+        boxShadow: hovered
+          ? "0 12px 40px rgba(108, 99, 255, 0.2), inset 0 1px 0 rgba(255,255,255,0.08)"
+          : "0 2px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",
+        transition: "all 0.25s ease",
+        padding: "16px",
+        textAlign: "left",
+        width: "100%",
+        cursor: "pointer",
+        outline: active ? "2px solid rgba(108,99,255,0.5)" : "none",
+        outlineOffset: "2px",
+      }}
+    >
+      {/* category pill */}
+      <span
+        style={{
+          display: "inline-block",
+          background: "rgba(108, 99, 255, 0.18)",
+          border: "1px solid rgba(108, 99, 255, 0.3)",
+          color: "#a89eff",
+          borderRadius: "999px",
+          padding: "2px 10px",
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        {category}
+      </span>
+
+      {/* title + arrow */}
+      <div style={{ marginTop: "12px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+        <h3
+          style={{
+            fontSize: "13px",
+            fontWeight: 600,
+            lineHeight: "1.4",
+            color: hovered || active ? "#a89eff" : "#f1f5f9",
+            transition: "color 0.2s",
+            margin: 0,
+          }}
+        >
+          {domain}
+        </h3>
+        <div
+          style={{
+            flexShrink: 0,
+            background: hovered || active ? "#6C63FF" : "rgba(108, 99, 255, 0.15)",
+            border: "1px solid rgba(108, 99, 255, 0.3)",
+            borderRadius: "10px",
+            padding: "6px 10px",
+            fontSize: "13px",
+            color: hovered || active ? "#fff" : "#6C63FF",
+            transition: "all 0.2s",
+          }}
+        >
+          →
+        </div>
+      </div>
+
+      {/* footer */}
+      <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+        <span
+          style={{
+            width: "7px",
+            height: "7px",
+            borderRadius: "50%",
+            background: "#22C55E",
+            boxShadow: "0 0 6px rgba(34,197,94,0.6)",
+            display: "inline-block",
+          }}
+        />
+        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>Open practice set</span>
+      </div>
+    </button>
+  );
+}
+
 export default function DomainSelectorPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -108,136 +231,196 @@ export default function DomainSelectorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050816] text-white">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <>
+      <SoftBackdropNew /> 
+      <LenisScroll />
 
-        {/* ── HEADER CARD ── */}
-        <div className="mb-10 rounded-3xl border border-white/10 bg-[#1F2937] p-6 shadow-2xl shadow-black/30 sm:p-8">
+      <div  className="relative z-10 min-h-screen text-white bg-transparent">
+        <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "32px 24px" }}>
 
-          {/* top row */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#6C63FF]/30 bg-[#2A1454] px-4 py-2 text-sm text-white/90">
-              <span className="text-base">✦</span>
-              Interview Practice Domain Selector
-            </div>
+          {/* ── HEADER CARD ── */}
+          <div style={{ ...glass.headerCard, padding: "32px", marginBottom: "32px" }}>
 
-            {/* categories · topics badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#111827] px-4 py-2 text-sm text-white/70">
-              <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
-              {groups.length} categories · {totalTopics} topics
-            </div>
-          </div>
+            {/* top row */}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "rgba(108, 99, 255, 0.12)",
+                  border: "1px solid rgba(108, 99, 255, 0.25)",
+                  borderRadius: "999px",
+                  padding: "6px 16px",
+                  fontSize: "13px",
+                  color: "rgba(255,255,255,0.85)",
+                }}
+              >
+                <span>✦</span>
+                Interview Practice Domain Selector
+              </div>
 
-          {/* heading + search row */}
-          <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.9fr] lg:items-end">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-                Choose a domain,{" "}
-                <span className="bg-gradient-to-r from-[#7C6FF7] to-[#6C63FF] bg-clip-text text-transparent">
-                  start practicing.
-                </span>
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/60 sm:text-base">
-                Browse every interview topic in one place. Search fast, pick a domain, and jump straight into
-                a focused practice session.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-white/50">
-                Search Domains
-              </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-base">
-                  🔍
-                </span>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Type to filter..."
-                  className="w-full rounded-xl border border-white/10 bg-[#1F2937] py-3 pl-9 pr-4 text-white outline-none placeholder:text-white/30 focus:border-[#6C63FF] focus:ring-2 focus:ring-[#6C63FF]/30"
-                />
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "999px",
+                  padding: "6px 16px",
+                  fontSize: "13px",
+                  color: "rgba(255,255,255,0.55)",
+                }}
+              >
+                <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#22C55E", boxShadow: "0 0 6px rgba(34,197,94,0.5)", display: "inline-block" }} />
+                {groups.length} categories · {totalTopics} topics
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* ── CATEGORY SECTIONS ── */}
-        <div className="space-y-6">
-          {filteredGroups.map((group, idx) => (
-            <section
-              key={group.category}
-              // className="rounded-3xl border bg-[#1F2937] p-6 shadow-xl shadow-black/20 sm:p-8"
-              className="rounded-[22px] border border-white/7 bg-white/[0.03] p-5 sm:p-6"
-              // style={{ borderColor: "#0d1117" }}
+            {/* heading + search */}
+            <div style={{ marginTop: "28px", display: "grid", gap: "24px", gridTemplateColumns: "1.4fr 0.9fr", alignItems: "end" }}
+              className="header-grid"
             >
-              {/* section label + heading */}
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <span className="mb-1 inline-block rounded-full bg-[#2A1454] px-3 py-0.5 text-xs font-semibold text-[#6C63FF]">
-                    Section {idx + 1}
+              <div>
+                <h1 style={{ fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.1, margin: 0 }}>
+                  Choose a domain,{" "}
+                  <span style={{ background: "linear-gradient(135deg, #a89eff 0%, #6C63FF 100%)", WebkitBackdropFilter: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                    start practicing.
                   </span>
-                  <h2 className="text-xl font-bold sm:text-2xl">{group.category}</h2>
-                  <p className="mt-0.5 text-xs text-white/40">
-                    {group.domains.length} topic{group.domains.length !== 1 ? "s" : ""} available
-                  </p>
+                </h1>
+                <p style={{ marginTop: "16px", fontSize: "14px", lineHeight: 1.7, color: "rgba(255,255,255,0.5)", maxWidth: "480px" }}>
+                  Browse every interview topic in one place. Search fast, pick a domain, and jump straight into a focused practice session.
+                </p>
+              </div>
+
+              {/* search box */}
+              <div
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "16px",
+                  padding: "16px",
+                }}
+              >
+                <label style={{ display: "block", marginBottom: "8px", fontSize: "10px", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>
+                  Search Domains
+                </label>
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.25)", pointerEvents: "none" }}>
+                    🔍
+                  </span>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Type to filter..."
+                    style={{
+                      width: "100%",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: "12px",
+                      padding: "10px 14px 10px 36px",
+                      color: "#fff",
+                      fontSize: "14px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                      transition: "border-color 0.2s, box-shadow 0.2s",
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "rgba(108,99,255,0.5)";
+                      e.target.style.boxShadow = "0 0 0 3px rgba(108,99,255,0.12)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "rgba(255,255,255,0.08)";
+                      e.target.style.boxShadow = "none";
+                    }}
+                  />
                 </div>
-                <span className="rounded-full border border-white/10 bg-[#111827] px-3 py-1 text-xs text-white/50">
-                  {group.domains.length} topics
-                </span>
               </div>
+            </div>
+          </div>
 
-              {/* domain cards */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {group.domains.map((domain) => {
-                  const active = selected === domain;
-                  return (
-                    <button
-                      key={domain}
-                      // onClick={() => openPractice(domain)}
-                      className={[
-                        "group relative rounded-2xl border p-4 text-left transition-all duration-300",
-                        "bg-[#111827] hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40",
-                        active
-                          ? "border-[#6C63FF] ring-2 ring-[#6C63FF]/30"
-                          : "border-white/10 hover:border-[#6C63FF]/50",
-                      ].join(" ")}
+          {/* ── CATEGORY SECTIONS ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {filteredGroups.map((group, idx) => (
+              <section key={group.category} style={glass.section}>
+
+                {/* section header */}
+                <div style={{ marginBottom: "20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: "rgba(108, 99, 255, 0.18)",
+                        border: "1px solid rgba(108, 99, 255, 0.3)",
+                        color: "#a89eff",
+                        borderRadius: "999px",
+                        padding: "2px 12px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        marginBottom: "8px",
+                      }}
                     >
-                      {/* category pill */}
-                      <span className="inline-block rounded-full bg-[#2A1454] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-[#6C63FF]">
-                        {group.category}
-                      </span>
+                      Section {idx + 1}
+                    </span>
+                    <h2 style={{ fontSize: "clamp(18px, 2vw, 22px)", fontWeight: 700, margin: "0 0 4px 0" }}>{group.category}</h2>
+                    <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", margin: 0 }}>
+                      {group.domains.length} topic{group.domains.length !== 1 ? "s" : ""} available
+                    </p>
+                  </div>
+                  <span
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: "999px",
+                      padding: "4px 14px",
+                      fontSize: "11px",
+                      color: "rgba(255,255,255,0.4)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {group.domains.length} topics
+                  </span>
+                </div>
 
-                      {/* title + arrow */}
-                      <div className="mt-3 flex items-start justify-between gap-3">
-                        <h3 className="text-sm font-semibold leading-5 text-white group-hover:text-[#6C63FF] transition-colors">
-                          {domain}
-                        </h3>
-                        <div
-                          className={[
-                            "shrink-0 rounded-xl p-2 text-sm transition-all duration-200",
-                            active
-                              ? "bg-[#6C63FF] text-white"
-                              : "bg-[#2A1454] text-[#6C63FF] group-hover:bg-[#6C63FF] group-hover:text-white",
-                          ].join(" ")}
-                        >
-                          →
-                        </div>
-                      </div>
+                {/* domain cards grid */}
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "14px",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  }}
+                >
+                  {group.domains.map((domain) => (
+                    <DomainCard
+                      key={domain}
+                      domain={domain}
+                      category={group.category}
+                      active={selected === domain}
+                      onClick={() => openPractice(domain)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
 
-                      {/* footer */}
-                      <div className="mt-4 flex items-center gap-2 text-xs text-white/40">
-                        <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
-                        Open practice set
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
         </div>
       </div>
-    </div>
+
+      {/* responsive fix for header grid */}
+      <style>{`
+        @media (max-width: 768px) {
+          .header-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        input::placeholder {
+          color: rgba(255,255,255,0.25);
+        }
+      `}</style>
+    </>
   );
 }
