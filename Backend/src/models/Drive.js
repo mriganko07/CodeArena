@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const driveSchema = new mongoose.Schema({
+  driveId: { type: String, required: true, unique: true },
   hiringPositionName: { type: String, required: true },
   driveDate: { type: Date, required: true },
   driveType: { type: String, enum: ["mcq", "code base"], required: true },
