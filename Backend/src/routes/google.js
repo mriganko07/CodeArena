@@ -18,24 +18,28 @@ export const initGoogleStrategy = () => {
       async (accessToken, refreshToken, profile, done) => {
         try {
           const email = profile.emails[0].value;
+          const photo = profile.photos?.[0]?.value || "";
+  
           let user = await User.findOne({ email });
-
+  
           if (user) {
-            if (!user.googleId) {
-              user.googleId = profile.id;
-              user.isVerified = true;
-              await user.save();
-            }
+            user.googleId = profile.id;
+            user.isVerified = true;
+  
+            if (photo) user.picture = photo;
+  
+            await user.save();
           } else {
             user = await User.create({
               firstName: profile.name.givenName,
               lastName: profile.name.familyName || ".",
               email,
               googleId: profile.id,
+              picture: photo,
               isVerified: true,
             });
           }
-
+  
           return done(null, user);
         } catch (error) {
           return done(error, null);

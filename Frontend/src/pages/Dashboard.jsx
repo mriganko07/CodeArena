@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 export default function Dashboard() {
   const { user, logout } = useAuth();
 
-  return (
+  return ( 
     <div style={{
       minHeight: "100vh", background: "#050816", color: "#fff",
       display: "flex", alignItems: "center", justifyContent: "center",
@@ -16,12 +16,35 @@ export default function Dashboard() {
         padding: "40px", textAlign: "center", maxWidth: "400px", width: "90%"
       }}>
         <div style={{
-          width: "64px", height: "64px", borderRadius: "50%",
+          width: "64px",
+          height: "64px",
+          borderRadius: "50%",
+          overflow: "hidden",
+          margin: "0 auto 16px",
           background: "linear-gradient(135deg, #6C63FF, #2A1454)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 16px", fontSize: "24px"
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "24px",
+          color: "#fff"
         }}>
-          {user?.firstName?.[0]}{user?.lastName?.[0]}
+          {user?.picture ? (
+            <img
+            src={user.picture}
+            alt="Profile"
+            referrerPolicy="no-referrer"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover"
+            }}
+          />
+          ) : (
+            <>
+              {user?.firstName?.[0]}
+              {user?.lastName?.[0]}
+            </>
+          )}
         </div>
 
         <h1 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 700 }}>

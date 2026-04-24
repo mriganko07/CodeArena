@@ -56,8 +56,19 @@ export default function Header({ isInterviewActive }) {
               if (!isInterviewActive) setOpen(!open);
             }}
           >
-            <div className="w-9 h-9 rounded-full bg-indigo-900 text-white flex items-center justify-center text-sm">
-              {initials}
+            <div className="p-[2px] rounded-full bg-gradient-to-tr from-indigo-600 via-purple-700 to-indigo-900 shadow-[0_0_12px_rgba(99,102,241,0.35)]">
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-[#0f172a] flex items-center justify-center text-sm text-white">
+                {user?.picture ? (
+                  <img
+                    src={user.picture}
+                    alt="Profile"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
             </div>
 
             <h3 className="text-slate-300 font-semibold">{fullName}</h3>
