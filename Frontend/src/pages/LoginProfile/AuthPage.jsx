@@ -4,6 +4,8 @@ import { login as loginRequest, signup, loginWithGoogle, validate2FA } from "../
 // At the top of AuthPage.jsx — add this import
 import { useAuth } from "../../context/AuthContext.jsx";
 
+import SoftBackdrop from "../../components/SoftBackdrop";
+
 const EyeIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -510,11 +512,13 @@ export default function AuthPage() {
   const [tab, setTab] = useState("login");
 
   return (
-    <div
-      className="relative min-h-screen flex items-center justify-center px-6 py-8 overflow-x-hidden"
-      style={{ background: "#050816", fontFamily: "'DM Sans', sans-serif" }}
-    >
-      <style>{`
+    <>
+
+      <div
+        className="relative min-h-screen flex items-center justify-center px-6 py-8 overflow-x-hidden"
+        style={{ background: "#050816", fontFamily: "'DM Sans', sans-serif" }}
+      >
+        <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
         @keyframes fadeSlideIn {
           from { opacity: 0; transform: translateY(12px); }
@@ -522,57 +526,61 @@ export default function AuthPage() {
         }
       `}</style>
 
-      {/* Background Orbs */}
-      <div className="fixed rounded-full pointer-events-none z-0"
+        {/* Background Orbs */}
+        <div className="fixed rounded-full pointer-events-none z-0"
         style={{ width: 420, height: 420, background: "#2A1454", top: -80, left: -100, opacity: 0.7, filter: "blur(80px)" }} />
       <div className="fixed rounded-full pointer-events-none z-0"
         style={{ width: 300, height: 300, background: "#6C63FF22", bottom: 40, right: -60, opacity: 0.5, filter: "blur(80px)" }} />
       <div className="fixed rounded-full pointer-events-none z-0"
-        style={{ width: 200, height: 200, background: "#6C63FF18", top: "40%", left: "50%", opacity: 0.4, filter: "blur(80px)" }} />
+        style={{ width: 200, height: 200, background: "#6C63FF18", top: "40%", left: "50%", opacity: 0.4, filter: "blur(80px)" }} />  
+          <SoftBackdrop />
 
-      <div className="relative z-10 w-full max-w-[440px]">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2.5 mb-2">
-            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #6C63FF, #2A1454)" }}>
-              <LogoIcon />
+
+        <div className="relative z-10 w-full max-w-[440px]">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2.5 mb-2">
+              <div className="w-9 h-9 rounded-[10px] flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #6C63FF, #2A1454)" }}>
+                <LogoIcon />
+              </div>
+              <h1 className="text-[22px] font-extrabold tracking-tight text-white"
+                style={{ fontFamily: "'Syne', sans-serif" }}>
+                CodeArena
+              </h1>
             </div>
-            <h1 className="text-[22px] font-extrabold tracking-tight text-white"
-              style={{ fontFamily: "'Syne', sans-serif" }}>
-              CodeArena
-            </h1>
+            <p className="text-zinc-400 text-[13px]">Your secure gateway to everything</p>
           </div>
-          <p className="text-zinc-400 text-[13px]">Your secure gateway to everything</p>
-        </div>
 
-        {/* Card */}
-        <div className="rounded-[20px] p-8 border border-[#6C63FF33]"
-          style={{
-            background: "linear-gradient(135deg, #1F2937ee 0%, #1A0B2E99 100%)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-          }}>
-          {/* Tab Switcher */}
-          <div className="flex gap-1.5 rounded-xl p-1 mb-7 border border-[#2A1454]"
-            style={{ background: "#05081699" }}>
-            {["login", "signup"].map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 py-2 rounded-[9px] text-sm font-semibold border-none cursor-pointer
+          {/* Card */}
+          <div className="rounded-[20px] p-8 border border-[#6C63FF33]"
+            style={{
+              background: "linear-gradient(135deg, #1F2937ee 0%, #1A0B2E99 100%)",
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+            }}>
+            {/* Tab Switcher */}
+            <div className="flex gap-1.5 rounded-xl p-1 mb-7 border border-[#2A1454]"
+              style={{ background: "#05081699" }}>
+              {["login", "signup"].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`flex-1 py-2 rounded-[9px] text-sm font-semibold border-none cursor-pointer
                   transition-all duration-200
                   ${tab === t ? "text-white shadow-[0_0_20px_#6C63FF55]" : "text-zinc-400 bg-transparent"}`}
-                style={{ fontFamily: "'Syne', sans-serif", background: tab === t ? "#6C63FF" : "transparent" }}
-              >
-                {t === "login" ? "Sign In" : "Sign Up"}
-              </button>
-            ))}
-          </div>
+                  style={{ fontFamily: "'Syne', sans-serif", background: tab === t ? "#6C63FF" : "transparent" }}
+                >
+                  {t === "login" ? "Sign In" : "Sign Up"}
+                </button>
+              ))}
+            </div>
 
-          {tab === "login" ? <LoginForm /> : <SignupForm />}
+            {tab === "login" ? <LoginForm /> : <SignupForm />}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
+
 }

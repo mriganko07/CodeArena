@@ -28,10 +28,15 @@ const userSchema = new mongoose.Schema(
       type: String,
       minlength: [8, "Password must be at least 8 characters"],
       select: false,
+      default: null,
     },
     googleId: {
       type: String,
       default: null,
+    },
+    picture: {
+      type: String,
+      default: "",
     },
 
     // Email Verification

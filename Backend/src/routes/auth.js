@@ -5,6 +5,7 @@ import { body, validationResult } from "express-validator";
 import User from "../models/User.js";
 import { protect } from "../middleware/auth.js";
 import { sendEmail, verificationEmailHTML } from "../utils/sendEmail.js";
+import axios from "axios";
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ const sendTokenResponse = (user, statusCode, res) => {
       email: user.email,
       isVerified: user.isVerified,
       twoFactorEnabled: user.twoFactorEnabled,
+      picture: user.picture,
     },
   });
 };
@@ -162,6 +164,47 @@ router.post(
     }
   }
 );
+
+// GOOGLE LOGIN ROUTE
+router.post("/google", async (req, res) => {
+  const { access_token } = req.body;
+
+  try {
+    const { data } = await axios.get(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
+    console.log("GOOGLE DATA:", data); 
+
+    const { email, given_name, family_name, picture, sub } = data;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        firstName: given_name,
+        lastName: family_name,
+        email,
+        googleId: sub,
+        picture: picture || "",   // ensure value
+        isVerified: true,
+      });
+    } else {
+      user.picture = picture || user.picture; // don't overwrite with empty
+      user.googleId = sub;
+      await user.save();
+    }
+
+    sendTokenResponse(user, 200, res);
+  } catch (error) {
+    console.error("Google auth error:", error);
+    res.status(500).json({ success: false, message: "Google auth failed" });
+  }
+});
 
 // ── GET /api/auth/me (protected) ──────────────────────────────────────────────
 router.get("/me", protect, async (req, res) => {
