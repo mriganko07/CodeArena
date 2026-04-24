@@ -1,77 +1,263 @@
-import React, { useState, useRef, useEffect } from "react";
-import Navbar from "../../components/Navbar";
+import React, { useState, useEffect } from "react";
 import SoftBackdrop from "../../components/SoftBackdrop";
 import LenisScroll from "../../components/lenis";
 import Header from "../../components/Header";
-import DriveCard from "../../components/DriveCard";
 import DateTime from "../../components/DateTime";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
-const pastDrives = [
-    {
-        id: 1,
-        title: "Techno India Group of Institutions Kolkata Bot Assessment 24th Feb",
-        date: "Feb 24, 2026",
-        status: "Completed",
-    },
-    {
-        id: 2,
-        title: "Techno India Group of Institutions Kolkata 30 Jan",
-        date: "Jan 30, 2026",
-        status: "Completed",
-    },
-    {
-        id: 3,
-        title: "Global Tech Solutions Coding Challenge",
-        date: "Dec 15, 2025",
-        status: "Pending",
-    },
-];
+const InfoModal = ({ isOpen, title, message, onClose }) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+          />
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative w-full max-w-md bg-[#0f1117]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-10 shadow-2xl overflow-hidden text-center"
+          >
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-indigo-500" />
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold tracking-tight text-indigo-300">
+                {title}
+              </h3>
+              <p className="text-gray-400 text-sm leading-relaxed">{message}</p>
+            </div>
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={onClose}
+                className="w-full py-3.5 rounded-2xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 const DrivePreview = () => {
-    const { user } = useAuth();
-    
-    const fullName = user ? `${user.firstName} ${user.lastName}` : "User";
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const fullName = user ? `${user.firstName} ${user.lastName}` : "User";
 
-    return (
-        <>
-            <SoftBackdrop />
-            <LenisScroll />
+  const [assignedDrives, setAssignedDrives] = useState([]);
+  const [userResults, setUserResults] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-            <Header />
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+  });
 
-            <motion.div
-                className="p-6 max-w-5xl mx-auto"
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-            >
-                <DateTime />
+  useEffect(() => {
+    if (!user) return;
 
-                <h1 className="text-3xl font-bold mb-10 bg-gradient-to-r from-indigo-500 via-indigo-400 to-indigo-300 bg-clip-text text-transparent">
-                    Welcome, {fullName}
-                </h1>
+    const fetchUserDrives = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("http://localhost:4000/api/auth/my-drives", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
 
-                <div className="text-gray-300 text-sm font-medium mb-4">
-                    PAST DRIVES
-                </div>
+        if (data.success) {
+          const validInterviews = data.interviews.filter((inv) => inv.driveId);
+          setAssignedDrives(validInterviews);
+          setUserResults(data.results || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch drives:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-                <div className="space-y-4">
-                    {pastDrives.map((drive, index) => (
-                        <motion.div
-                            key={drive.id}
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.15 }}
-                        >
-                            <DriveCard drive={drive} />
-                        </motion.div>
-                    ))}
-                </div>
-            </motion.div>
-        </>
+    fetchUserDrives();
+  }, [user]);
+
+  const openModal = (title, message) => {
+    setModalConfig({ isOpen: true, title, message });
+  };
+
+  const closeModal = () => {
+    setModalConfig((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const getDriveStatus = (driveData) => {
+    const drive = driveData.driveId;
+    if (!drive) return null;
+
+    const startTime = new Date(drive.driveDate).getTime();
+    const durationMs = drive.timeDurationInMin * 60 * 1000;
+    const endTime = startTime + durationMs;
+    const now = Date.now();
+
+    const hasResult = userResults.find(
+      (r) => r.driveId && r.driveId._id === drive._id
     );
+
+    if (now < startTime) {
+      return { state: "upcoming", text: "Start Interview" };
+    } else if (now >= startTime && now <= endTime) {
+      if (hasResult)
+        return {
+          state: "completed",
+          text: "View Result",
+          resultId: hasResult._id,
+        };
+      return { state: "active", text: "Start Interview" };
+    } else {
+      if (hasResult)
+        return {
+          state: "completed",
+          text: "View Result",
+          resultId: hasResult._id,
+        };
+      return { state: "missed", text: "Not Attempted" };
+    }
+  };
+
+  const handleAction = (statusInfo, drive) => {
+    if (statusInfo.state === "upcoming") {
+      openModal(
+        "Interview Not Started",
+        `This interview will be enabled at ${new Date(
+          drive.driveDate
+        ).toLocaleString()}. Please return at the scheduled time.`
+      );
+    } else if (statusInfo.state === "active") {
+      navigate("/interviewPanel", { state: { drive } });
+    } else if (statusInfo.state === "missed") {
+      openModal(
+        "Not Attempted",
+        "You have not attempted this interview. The scheduled time window has passed."
+      );
+    } else if (statusInfo.state === "completed") {
+      openModal(
+        "Results",
+        "Your interview is complete. Results will be available soon."
+      );
+    }
+  };
+
+  return (
+    <>
+      <SoftBackdrop />
+      <LenisScroll />
+      <Header />
+      <InfoModal {...modalConfig} onClose={closeModal} />
+
+      <motion.div
+        className="p-6 max-w-5xl mx-auto relative z-10"
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <DateTime />
+
+        <h1 className="text-3xl font-bold mb-10 bg-gradient-to-r from-indigo-500 via-indigo-400 to-indigo-300 bg-clip-text text-transparent">
+          Welcome, {fullName}
+        </h1>
+
+        <div className="text-gray-300 text-sm font-medium mb-4 uppercase tracking-widest">
+          Assigned Drives
+        </div>
+
+        {loading ? (
+          <div className="text-indigo-400 animate-pulse text-center py-10 font-bold">
+            Loading your assigned drives...
+          </div>
+        ) : assignedDrives.length === 0 ? (
+          <div className="text-gray-400 text-center py-10 border border-white/10 rounded-2xl bg-white/5">
+            You currently have no assigned drives.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {assignedDrives.map((interview, index) => {
+              const drive = interview.driveId;
+              if (!drive) return null;
+
+              const statusInfo = getDriveStatus(interview);
+
+              let btnClass =
+                "px-6 py-2.5 rounded-xl font-bold text-sm transition-all ";
+              if (statusInfo.state === "upcoming") {
+                btnClass +=
+                  "bg-gray-600/50 text-gray-400 cursor-pointer hover:bg-gray-600/70 border border-gray-500/30";
+              } else if (statusInfo.state === "active") {
+                btnClass +=
+                  "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)]";
+              } else if (statusInfo.state === "missed") {
+                btnClass +=
+                  "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 cursor-pointer";
+              } else if (statusInfo.state === "completed") {
+                btnClass +=
+                  "bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30";
+              }
+
+              return (
+                <motion.div
+                  key={interview._id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.15 }}
+                  className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:bg-white/10 transition-colors backdrop-blur-sm"
+                >
+                  <div className="flex-1">
+                    <div className="text-xs text-indigo-400 font-mono font-bold mb-2">
+                      ID: {drive.driveId}
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-3">
+                      {drive.hiringPositionName}
+                    </h3>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-300">
+                      <span className="flex items-center gap-1.5">
+                        {new Date(drive.driveDate).toLocaleString()}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        {drive.timeDurationInMin} mins
+                      </span>
+                      <span className="flex items-center gap-1.5 uppercase text-xs font-bold text-indigo-300">
+                        {drive.driveType}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        {drive.numberOfQuestions} Qs
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        {drive.totalMarks} Marks
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="w-full md:w-auto flex justify-end">
+                    <button
+                      onClick={() => handleAction(statusInfo, drive)}
+                      className={btnClass}
+                    >
+                      {statusInfo.text}
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </motion.div>
+    </>
+  );
 };
 
 export default DrivePreview;
