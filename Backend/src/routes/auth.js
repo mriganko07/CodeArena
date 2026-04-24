@@ -7,6 +7,11 @@ import { protect } from "../middleware/auth.js";
 import axios from "axios";
 import Interview from "../models/Interview.js";
 import InterviewResult from "../models/InterviewResult.js";
+import { verifyOtp } from "../controllers/auth.js";
+
+import OTP from "../models/OTP.js";
+import { sendEmail, verificationEmailHTML, otpEmailHTML } from "../utils/sendEmail.js";
+import bcrypt from "bcrypt";
 
 const router = express.Router();
 
@@ -281,6 +286,17 @@ router.post("/submit-result", protect, async (req, res) => {
     console.error("Result submission error:", error);
     res.status(500).json({ success: false, message: "Server error during submission." });
   }
+});
+
+
+router.post("/verify-otp", verifyOtp);
+
+// ── ENABLE 2FA ─────────────────────────────
+router.post("/enable-2fa", protect, async (req, res) => {
+  req.user.twoFactorEnabled = true;
+  await req.user.save();
+
+  res.json({ success: true, message: "2FA enabled" });
 });
 
 export default router;
