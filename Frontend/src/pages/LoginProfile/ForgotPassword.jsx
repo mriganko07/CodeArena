@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { FaCheckCircle } from "react-icons/fa";
 
 const ForgotPassword = () => {
   const [currentScreen, setCurrentScreen] = useState(1);
@@ -30,25 +31,77 @@ const ForgotPassword = () => {
     window.location.href = "/login";
   };
 
-  const goToOTP = (e) => {
+  const goToOTP = async (e) => {
     e.preventDefault();
+  
     if (!email || !email.includes("@")) return;
-    setCurrentScreen(2);
-    setResendTimer(30);
-    setTimeout(() => otpRefs.current[0]?.focus(), 100);
+  
+    try {
+      const res = await fetch("http://localhost:4000/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+  
+      const data = await res.json();
+  
+      if (!res.ok) throw new Error(data.message);
+  
+      setCurrentScreen(2);
+      setResendTimer(30);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const goToReset = (e) => {
     e.preventDefault();
-    if (otp.some((d) => !d)) return;
+  
+    const code = otp.join("");
+  
+    if (!code || code.length !== 6) {
+      alert("Please enter the 6-digit OTP");
+      return;
+    }
+  
+    if (!/^\d{6}$/.test(code)) {
+      alert("Invalid OTP format");
+      return;
+    }
+  
     setCurrentScreen(3);
   };
 
-  const goToSuccess = (e) => {
+  const goToSuccess = async (e) => {
     e.preventDefault();
-    if (newPass.length < 8) return;
-    if (newPass !== confirmPass) return;
-    setCurrentScreen(4);
+  
+    if (newPass.length < 8) return alert("Password too short");
+    if (newPass !== confirmPass) return alert("Passwords do not match");
+  
+    try {
+      const res = await fetch("http://localhost:4000/api/auth/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          otp: otp.join(""),
+          newPassword: newPass,
+        }),
+      });
+  
+      const data = await res.json();
+  
+      if (!res.ok) throw new Error(data.message);
+  
+      setCurrentScreen(4);
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleOtpChange = (index, value) => {
@@ -95,7 +148,7 @@ const ForgotPassword = () => {
     if (/[0-9]/.test(val)) score++;
     if (/[^A-Za-z0-9]/.test(val)) score++;
 
-    const labels = ["Too weak", "Fair", "Good", "Strong 💪"];
+    const labels = ["Too weak", "Fair", "Good", "Strong"];
     setStrengthScore(score);
     setStrengthLabel(
       score > 0 ? labels[score - 1] : "Start typing to check strength"
@@ -123,7 +176,7 @@ const ForgotPassword = () => {
         {currentScreen === 1 && (
           <div>
             <h1 className="text-white text-3xl font-bold mb-2">
-              Forgot your <br /> password?
+              Forgot your password?
             </h1>
             <p className="text-sm text-zinc-400 mb-8">
               Enter your email and we'll send a reset code.
@@ -292,7 +345,8 @@ const ForgotPassword = () => {
         {/* Screen 4 */}
         {currentScreen === 4 && (
           <div className="text-center">
-            <div className="text-5xl mb-5">✅</div>
+            {/* Icon */}
+            <FaCheckCircle className="text-green-500 text-5xl mx-auto mb-5" />
 
             <h1 className="text-white text-3xl font-bold mb-2">
               All Done!

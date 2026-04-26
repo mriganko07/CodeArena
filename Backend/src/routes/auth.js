@@ -299,4 +299,77 @@ router.post("/enable-2fa", protect, async (req, res) => {
   res.json({ success: true, message: "2FA enabled" });
 });
 
+// ── FORGET PASSWORD ─────────────────────────────
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await OTP.deleteMany({ email });
+
+    const hashedOtp = await bcrypt.hash(otp, 10);
+
+    await OTP.create({
+      email,
+      otp: hashedOtp,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    await sendEmail({
+      to: email,
+      subject: "Reset Password OTP",
+      html: otpEmailHTML(otp),
+    });
+
+    res.json({ success: true, message: "OTP sent to email" });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+// ── RESET PASSWORD ─────────────────────────────
+
+router.post("/reset-password", async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  try {
+    const otpRecord = await OTP.findOne({ email }).sort({ createdAt: -1 });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "OTP not found" });
+    }
+
+    if (otpRecord.expiresAt < new Date()) {
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    const isMatch = await bcrypt.compare(String(otp), otpRecord.otp);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    const user = await User.findOne({ email }).select("+password");
+
+    user.password = newPassword;
+    await user.save();
+
+    await OTP.deleteMany({ email });
+
+    res.json({ success: true, message: "Password reset successful" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;
