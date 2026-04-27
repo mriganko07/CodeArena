@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Search, ChevronDown, FileText, User, Lock, LogOut, X } from "lucide-react";
 import SoftBackdrop from "./SoftBackdrop";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const Header = () => {
     const [open, setOpen] = useState(false);
@@ -9,7 +10,8 @@ const Header = () => {
     const dropdownRef = useRef(null);
     const [search, setSearch] = useState("");
 
-    const { user, isLoggedIn } = useAuth();
+    const { user, isLoggedIn, logout } = useAuth();
+    const navigate = useNavigate();
 
     const fullName = user ? `${user.firstName} ${user.lastName}` : "";
     const initials = user ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() : "";
@@ -25,13 +27,18 @@ const Header = () => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const handleLogout = () => {
+        logout();
+        navigate("/");
+    };
+
     return (
         <>
             <header className="p-5 shadow-lg flex justify-between items-center bg-white/5 backdrop-blur-md relative">
 
-                <div className="text-2xl font-bold text-slate-200">
+                <a href="/" className="text-2xl font-bold text-slate-200 hover:text-white transition-colors cursor-pointer">
                     CodeArena
-                </div>
+                </a>
 
                 <div className="flex items-center border border-gray-600 rounded-lg overflow-hidden shadow-sm relative">
 
@@ -40,7 +47,7 @@ const Header = () => {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Enter Drive Id"
-                        className="px-3 py-2 outline-none text-sm w-52 pr-8"
+                        className="px-3 py-2 outline-none text-sm w-52 pr-8 bg-transparent text-white"
                     />
 
                     {search && (
@@ -88,12 +95,12 @@ const Header = () => {
 
                             <ChevronDown
                                 size={20}
-                                className={`transition-transform ${open ? "rotate-180" : ""}`}
+                                className={`transition-transform text-slate-300 ${open ? "rotate-180" : ""}`}
                             />
                         </div>
 
                         {open && (
-                            <div className="absolute right-0 mt-7 w-56 bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-lg p-3 space-y-2 z-50">
+                            <div className="absolute right-0 mt-7 w-56 bg-black/90 backdrop-blur-lg border border-white/20 rounded-2xl shadow-lg p-3 space-y-2 z-50">
 
                                 <a href="/profile" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
                                     <User size={16} strokeWidth={3} />
@@ -105,10 +112,13 @@ const Header = () => {
                                     Change Password
                                 </a>
 
-                                <a href="/logout" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-red-400 hover:bg-red-500/10">
+                                <button 
+                                    onClick={handleLogout} 
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-red-400 hover:bg-red-500/10 text-left"
+                                >
                                     <LogOut size={16} strokeWidth={3} />
                                     Log Out
-                                </a>
+                                </button>
 
                             </div>
                         )}
@@ -133,7 +143,7 @@ const Header = () => {
                         <div className="relative z-10 p-6 bg-white/20 backdrop-blur-2xl rounded-3xl">
                             <div className="flex items-center gap-2 border border-white/20 rounded-lg px-3 py-2 mb-4">
                                 <Search size={18} />
-                                <span className="text-white-900 font-medium">242769</span>
+                                <span className="text-white font-medium">242769</span>
                             </div>
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="p-2 rounded-full bg-white/20 flex items-center justify-center">
@@ -148,7 +158,7 @@ const Header = () => {
                                     </p>
                                 </div>
                             </div>
-                            <div className="space-y-2 text-sm text-white-900">
+                            <div className="space-y-2 text-sm text-white">
                                 <p>✔ Questions</p>
                                 <p>✔ Start Time: <b>10:00 AM IST</b></p>
                                 <p>✔ Duration: -</p>
@@ -156,7 +166,7 @@ const Header = () => {
                             <div className="flex justify-end gap-3 mt-6">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 border border-white/30 rounded-lg"
+                                    className="px-4 py-2 border text-white border-white/30 hover:bg-white/10 transition-colors rounded-lg"
                                 >
                                     Cancel
                                 </button>

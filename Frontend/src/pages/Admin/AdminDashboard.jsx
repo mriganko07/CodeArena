@@ -52,6 +52,19 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteInterview = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this interview assignment?")) return;
+    try {
+      const res = await fetch(`${API_URL}/interviews/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${fetchToken()}` },
+      });
+      if (res.ok) fetchData("interviews", "interviews");
+    } catch (error) {
+      console.error("Delete failed", error);
+    }
+  };
+
   const tabs = [
     { id: "users", label: "Users", icon: Users },
     { id: "drives", label: "Drives", icon: Server },
@@ -118,7 +131,7 @@ const AdminDashboard = () => {
               <div className="w-full">
                 {activeTab === "users" && <UsersTable users={data.users} />}
                 {activeTab === "drives" && <DrivesTable drives={data.drives} onDelete={handleDeleteDrive} />}
-                {activeTab === "interviews" && <InterviewsTable interviews={data.interviews} onEdit={setEditingInterview} />}
+                {activeTab === "interviews" && <InterviewsTable interviews={data.interviews} onEdit={setEditingInterview} onDelete={handleDeleteInterview} />}
                 {activeTab === "results" && <ResultsTable results={data.results} />}
               </div>
             )}
@@ -212,7 +225,7 @@ const DrivesTable = ({ drives, onDelete }) => (
   </table>
 );
 
-const InterviewsTable = ({ interviews, onEdit }) => (
+const InterviewsTable = ({ interviews, onEdit, onDelete }) => (
   <table className="w-full text-sm text-left">
     <thead className="text-xs text-indigo-300 uppercase bg-black/40">
       <tr>
@@ -239,9 +252,14 @@ const InterviewsTable = ({ interviews, onEdit }) => (
             </div>
           </td>
           <td className="px-6 py-4 text-right">
-            <button onClick={() => onEdit(i)} className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors" title="Edit Users">
-              <Edit2 size={16} />
-            </button>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => onEdit(i)} className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors" title="Edit Users">
+                <Edit2 size={16} />
+              </button>
+              <button onClick={() => onDelete(i._id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors" title="Delete Interview">
+                <Trash2 size={16} />
+              </button>
+            </div>
           </td>
         </tr>
       ))}

@@ -1,10 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import * as faceapi from "face-api.js";
 import SoftBackdrop from "../../components/SoftBackdrop";
 import LenisScroll from "../../components/lenis";
-import InterViewHeader from "../../components/InterViewHeader";
 import { useAuth } from "../../context/AuthContext";
 
 const CustomModal = ({ isOpen, title, message, type, onClose, onConfirm }) => {
@@ -32,7 +31,7 @@ const CustomModal = ({ isOpen, title, message, type, onClose, onConfirm }) => {
   );
 };
 
-const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
+const DeviceSetupModal = ({ isOpen, onClose, onConfirm, isModelsLoaded }) => {
   const previewVideoRef = useRef(null);
   const [error, setError] = useState(null);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -108,7 +107,13 @@ const DeviceSetupModal = ({ isOpen, onClose, onConfirm }) => {
               )}
             </div>
             <div className="mt-8 flex gap-3">
-              <button onClick={onConfirm} disabled={!!error} className="flex-1 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95">Start Interview</button>
+              <button 
+                onClick={onConfirm} 
+                disabled={!!error || !isModelsLoaded} 
+                className="flex-1 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+              >
+                {!isModelsLoaded ? "Loading AI..." : "Start Interview"}
+              </button>
               <button onClick={onClose} className="px-6 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95">Cancel</button>
             </div>
           </motion.div>
@@ -152,14 +157,23 @@ const InterviewPanel = () => {
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState({});
   const [codeData, setCodeData] = useState({});
+  
   const [outputResult, setOutputResult] = useState("");
+  const [runStatus, setRunStatus] = useState("idle");
+  const [metaText, setMetaText] = useState("");
+  const editorRef = useRef(null);
+  const lineNumbersRef = useRef(null);
+  const skulptLoaded = useRef(false);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [status, setStatus] = useState("idle");
   const [cameraError, setCameraError] = useState(null);
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
-  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
+
+  const [isSetupModalOpen, setIsSetupModalOpen] = useState(true);
+
+  const [liveTime, setLiveTime] = useState(new Date());
 
   const missingFaceFrames = useRef(0);
   const maskFrames = useRef(0);
@@ -169,14 +183,37 @@ const InterviewPanel = () => {
   const analysisTimeoutRef = useRef(null);
 
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
-
   const closeModal = () => setModalConfig((prev) => ({ ...prev, isOpen: false }));
   const triggerAlert = (title, message, type = "info", onConfirm = null) => { setModalConfig({ isOpen: true, title, message, type, onConfirm }); };
 
   useEffect(() => {
-    if (drive) setQuestions(generateQuestions(drive));
-    else navigate("/"); 
+    const timer = setInterval(() => setLiveTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (drive) {
+      setQuestions(generateQuestions(drive));
+      if (drive.driveType === "code base") {
+        setCodeData({ 0: "# Write and run Python here" });
+      }
+    } else navigate("/"); 
   }, [drive, navigate]);
+
+  useEffect(() => {
+    const loadSkulpt = async () => {
+      if (!skulptLoaded.current && drive?.driveType === "code base") {
+        const [skulpt, stdlib] = await Promise.all([
+          import('https://cdn.skypack.dev/skulpt'),
+          import('https://cdn.skypack.dev/skulpt-stdlib')
+        ]);
+        window.Sk = skulpt.Sk;
+        window.Sk.builtinFiles = stdlib.builtinFiles;
+        skulptLoaded.current = true;
+      }
+    };
+    loadSkulpt();
+  }, [drive]);
 
   useEffect(() => {
     let timer;
@@ -190,8 +227,10 @@ const InterviewPanel = () => {
 
   const submitAssessment = async (finalStatus = "Completed", reason = "") => {
     setStatus("idle");
-    const timeTaken = (drive.timeDurationInMin * 60) - timeLeft;
     
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    
+    const timeTaken = (drive.timeDurationInMin * 60) - timeLeft;
     const mockScore = Math.floor(Math.random() * ((drive.totalMarks || 100) + 1));
 
     try {
@@ -211,7 +250,13 @@ const InterviewPanel = () => {
           terminationReason: reason
         })
       });
-      triggerAlert("Assessment Finished", "Your responses and security metrics have been saved. You may safely close this tab.", "info", () => navigate("/drive"));
+      
+      if (finalStatus === "Terminated") {
+        triggerAlert("Session Terminated", `Your assessment was terminated due to security or environment violations. (${reason})`, "danger", () => navigate("/drive"));
+      } else {
+        triggerAlert("Assessment Finished", "Your responses and security metrics have been saved. You may safely close this tab.", "info", () => navigate("/drive"));
+      }
+      
     } catch (err) {
       console.error("Failed to submit", err);
     }
@@ -219,35 +264,93 @@ const InterviewPanel = () => {
 
   const terminateSession = (reason) => {
     submitAssessment("Terminated", reason);
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   };
 
-  const runPythonCode = async () => {
-    const code = codeData[currentQ] || "";
-    if (!code.trim()) { setOutputResult("> Please write some code first."); return; }
-    
-    setOutputResult("Executing Code...");
-    try {
-      const res = await fetch("https://emkc.org/api/v2/piston/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ language: "python", version: "*", files: [{ content: code }] })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-          setOutputResult(`API Error: ${data.message || 'Check browser console'}`);
-          return;
-      }
-      setOutputResult(data.run.output || data.run.stderr || "> Program executed successfully with no output.");
-    } catch (err) {
-      setOutputResult(`Network Error: ${err.message}. \n(Check if an Adblocker or Firewall is blocking the request).`);
+  const currentCode = codeData[currentQ] || "";
+
+  const renderLineNumbers = useCallback(() => {
+    if (!editorRef.current || !lineNumbersRef.current) return;
+    const count = Math.max(1, currentCode.split('\n').length);
+    lineNumbersRef.current.innerHTML = Array.from(
+      { length: count }, 
+      (_, i) => `<div class="pr-4">${i + 1}</div>`
+    ).join('');
+  }, [currentCode]);
+
+  useEffect(() => {
+    renderLineNumbers();
+  }, [currentCode, renderLineNumbers]);
+
+  const syncScroll = useCallback(() => {
+    if (lineNumbersRef.current && editorRef.current) {
+      lineNumbersRef.current.scrollTop = editorRef.current.scrollTop;
     }
-  };
+  }, []);
+
+  const runPythonCode = useCallback(async () => {
+    if (!window.Sk) {
+      setOutputResult("Compiler not loaded yet. Please wait.");
+      return;
+    }
+    
+    if (!currentCode.trim()) { setOutputResult("> Please write some code first."); return; }
+    
+    setOutputResult('');
+    setRunStatus('running');
+    setMetaText('Running...');
+    const start = performance.now();
+
+    window.Sk.configure({
+      output: (text) => setOutputResult((prev) => prev + text),
+      read: (file) => {
+        if (window.Sk.builtinFiles?.files[file] === undefined) {
+          throw `File not found: '${file}'`;
+        }
+        return window.Sk.builtinFiles.files[file];
+      },
+      __future__: window.Sk.python3
+    });
+
+    try {
+      await window.Sk.misceval.asyncToPromise(() => 
+        window.Sk.importMainWithBody('<stdin>', false, currentCode, true)
+      );
+      setRunStatus('success');
+      setMetaText(((performance.now() - start) / 1000).toFixed(3) + 's');
+      setOutputResult((prev) => prev.trim() ? prev : 'Code executed successfully with no output.');
+    } catch (err) {
+      setRunStatus('error');
+      setMetaText(((performance.now() - start) / 1000).toFixed(3) + 's');
+      setOutputResult(err.toString());
+    }
+  }, [currentCode]);
+
+  const handleKeyDownCode = useCallback((e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = editorRef.current.selectionStart;
+      const end = editorRef.current.selectionEnd;
+      const newCode = currentCode.slice(0, start) + '    ' + currentCode.slice(end);
+      setCodeData({ ...codeData, [currentQ]: newCode });
+      setTimeout(() => {
+        if(editorRef.current) editorRef.current.selectionStart = editorRef.current.selectionEnd = start + 4;
+      }, 0);
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      runPythonCode();
+    }
+  }, [currentCode, codeData, currentQ, runPythonCode]);
 
   const handleNext = () => {
     if (currentQ < questions.length - 1) {
       setCurrentQ(currentQ + 1);
       setOutputResult("");
+      setRunStatus("idle");
+      setMetaText("");
+      if (!codeData[currentQ + 1]) {
+        setCodeData(prev => ({...prev, [currentQ + 1]: "# Write and run Python here\n\n"}));
+      }
     } else submitAssessment("Completed", "User Submitted");
   };
 
@@ -275,7 +378,7 @@ const InterviewPanel = () => {
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
         stream.getTracks().forEach((track) => {
-          track.onended = () => { if (status === "active" && isComponentActive) terminateSession("Hardware Error."); };
+          track.onended = () => { if (status === "active" && isComponentActive) terminateSession("Hardware Error: Camera Disconnected."); };
         });
       } catch (err) {
         if (isComponentActive) setCameraError("Camera access denied.");
@@ -333,7 +436,7 @@ const InterviewPanel = () => {
               violations.current.noFace += 1;
               lastViolationTime.current = Date.now();
               missingFaceFrames.current = 0;
-              if (violations.current.noFace >= 4) terminateSession("Face obscured.");
+              if (violations.current.noFace >= 4) terminateSession("Face obscured or not visible.");
               else triggerAlert("Visibility Warning", `Warning ${violations.current.noFace}/3: Face not detected.`, "danger");
             }
             isAnalyzing.current = false; return;
@@ -411,14 +514,45 @@ const InterviewPanel = () => {
   };
 
   return (
-    <div className="min-h-screen text-white font-sans selection:bg-indigo-500/30 overflow-hidden">
+    <div className="min-h-screen text-white font-sans selection:bg-indigo-500/30 overflow-hidden bg-[#050816]">
       <SoftBackdrop />
       <LenisScroll />
-      <InterViewHeader isInterviewActive={status === "active"} />
       <CustomModal {...modalConfig} onClose={closeModal} />
-      <DeviceSetupModal isOpen={isSetupModalOpen} onClose={() => setIsSetupModalOpen(false)} onConfirm={startActualInterview} />
+      
+      <DeviceSetupModal 
+        isOpen={isSetupModalOpen} 
+        onClose={() => setIsSetupModalOpen(false)} 
+        onConfirm={startActualInterview} 
+        isModelsLoaded={isModelsLoaded}
+      />
 
-      <main className="p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-80px)] max-w-[1600px] mx-auto">
+      <div className="w-full max-w-[1600px] mx-auto px-4 lg:px-6 pt-4 flex justify-between items-center z-10 relative">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-extrabold text-indigo-400">
+            {liveTime.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+          </h2>
+          <p className="text-sm font-medium text-gray-300 mt-0.5">
+            {liveTime.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} <span className="text-gray-500">(Live Time)</span>
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="p-[2px] rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-indigo-900 shadow-[0_0_15px_rgba(139,92,246,0.4)]">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden bg-[#0f172a] flex items-center justify-center text-base font-bold text-white">
+              {user?.picture ? (
+                <img src={user.picture} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                `${user?.firstName?.charAt(0) || ""}${user?.lastName?.charAt(0) || ""}`.toUpperCase()
+              )}
+            </div>
+          </div>
+          <span className="text-lg sm:text-xl font-bold text-white hidden sm:block">
+            {user?.firstName} {user?.lastName}
+          </span>
+        </div>
+      </div>
+
+      <main className="p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-170px)] max-w-[1600px] mx-auto">
         <motion.section initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl">
           <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -434,7 +568,7 @@ const InterviewPanel = () => {
             )}
           </div>
 
-          <div className="flex-1 p-8 flex flex-col">
+          <div className="flex-1 p-6 lg:p-8 flex flex-col min-h-0">
             {status === "active" && drive?.driveType === "mcq" && (
               <div className="h-full flex flex-col justify-between max-w-4xl mx-auto w-full">
                 <div className="space-y-6">
@@ -449,7 +583,7 @@ const InterviewPanel = () => {
                     ))}
                   </div>
                 </div>
-                <div className="flex justify-center mt-10">
+                <div className="flex justify-center mt-10 shrink-0">
                   <button onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-3 rounded-xl text-sm font-bold uppercase tracking-widest active:scale-95 transition-all">
                     {currentQ === questions.length - 1 ? "Submit Assessment" : "Save & Next"}
                   </button>
@@ -458,14 +592,77 @@ const InterviewPanel = () => {
             )}
 
             {status === "active" && drive?.driveType === "code base" && (
-              <div className="h-full flex flex-col gap-4">
+              <div className="h-full flex flex-col gap-4 min-h-0">
                  <div className="flex justify-between items-center">
-                    <span className="text-indigo-400 font-mono text-sm">Editor: Python 3</span>
-                    <button onClick={runPythonCode} className="bg-green-600/20 border border-green-500/50 text-green-400 px-4 py-1.5 rounded-lg text-xs font-bold uppercase hover:bg-green-600/30">Run Code</button>
+                    <div>
+                      <span className="text-indigo-400 font-mono text-sm block mb-1">Question {currentQ + 1} of {questions.length}</span>
+                      <p className="text-sm text-gray-300">{questions[currentQ]?.question}</p>
+                    </div>
                  </div>
-                 <textarea value={codeData[currentQ] || ""} onChange={(e) => setCodeData({...codeData, [currentQ]: e.target.value})} placeholder="# Write Python code..." className="flex-1 w-full bg-[#0d0d0d] text-green-400 font-mono p-4 rounded-xl border border-white/10 focus:outline-none focus:border-indigo-500 resize-none text-sm shadow-inner" />
-                 <div className="h-32 bg-black/60 rounded-xl border border-white/10 p-3 font-mono text-xs overflow-y-auto whitespace-pre-wrap text-gray-300">{outputResult || "> Terminal Output..."}</div>
-                 <div className="flex justify-end mt-2">
+                 
+                 <div className="flex-1 flex flex-col bg-[#0b1220]/70 overflow-hidden rounded-xl border border-white/10 shadow-inner">
+                   <div className="h-14 shrink-0 border-b border-white/10 bg-[#050816]/70 backdrop-blur-xl px-4 flex items-center justify-between gap-4">
+                     <div>
+                       <p className="text-[10px] uppercase tracking-[0.24em] text-[#A1A1AA] font-semibold">Editor: Python 3</p>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <button 
+                         onClick={() => { setCodeData({...codeData, [currentQ]: ''}); setOutputResult(''); setMetaText(''); setRunStatus('idle'); }}
+                         className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#A1A1AA] hover:bg-white/10 hover:text-white transition-all"
+                       >
+                         Clear
+                       </button>
+                       <button 
+                         onClick={runPythonCode}
+                         disabled={runStatus === 'running'}
+                         className="rounded-lg bg-[#6C63FF] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#7b73ff] transition-all shadow-[0_0_0_1px_rgba(108,99,255,0.16),_0_10px_30px_rgba(0,0,0,0.28)] disabled:opacity-50"
+                       >
+                         Run Code
+                       </button>
+                     </div>
+                   </div>
+
+                   <div className="grid grid-rows-[minmax(0,1fr)_180px] flex-1 min-h-0 overflow-hidden">
+                     <div className="min-h-0 grid grid-cols-[50px_minmax(0,1fr)] bg-[#07101d] overflow-hidden">
+                       <div 
+                         ref={lineNumbersRef}
+                         className="overflow-hidden border-r border-white/10 bg-black/40 py-4 text-right text-[13px] leading-7 font-mono text-gray-600 select-none scrollbar-thin"
+                       />
+                       <textarea
+                         ref={editorRef}
+                         value={currentCode}
+                         onChange={(e) => setCodeData({...codeData, [currentQ]: e.target.value})}
+                         onScroll={syncScroll}
+                         onKeyDown={handleKeyDownCode}
+                         spellCheck="false"
+                         className="min-h-0 h-full w-full resize-none overflow-auto scrollbar-thin bg-transparent p-4 font-mono text-[13px] leading-7 text-green-400 outline-none"
+                         placeholder="# Write Python code here"
+                       />
+                     </div>
+
+                     <div className="border-t border-white/10 bg-[#050816]/80 flex flex-col min-h-0 overflow-hidden">
+                       <div className="h-10 shrink-0 px-4 border-b border-white/10 flex items-center justify-between">
+                         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[#A1A1AA]">
+                           <span 
+                             className={`h-2.5 w-2.5 rounded-full transition-all ${
+                               runStatus === 'running' ? 'bg-yellow-400 animate-pulse' :
+                               runStatus === 'success' ? 'bg-[#22C55E]' :
+                               runStatus === 'error' ? 'bg-red-400' :
+                               'bg-white/30'
+                             }`}
+                           />
+                           Output
+                         </div>
+                         <div className="text-xs text-[#A1A1AA] font-mono">{metaText}</div>
+                       </div>
+                       <pre className="min-h-0 flex-1 overflow-auto scrollbar-thin p-4 font-mono text-[13px] leading-7 text-slate-200 whitespace-pre-wrap">
+                         {outputResult || "> Terminal Output..."}
+                       </pre>
+                     </div>
+                   </div>
+                 </div>
+
+                 <div className="flex justify-center mt-4 shrink-0">
                   <button onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2.5 rounded-xl text-sm font-bold uppercase tracking-widest active:scale-95 transition-all">
                     {currentQ === questions.length - 1 ? "Submit Assessment" : "Save & Next"}
                   </button>
@@ -475,8 +672,9 @@ const InterviewPanel = () => {
 
             {status === "idle" && (
                 <div className="h-full flex flex-col justify-center items-center text-center">
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 via-indigo-200 to-white bg-clip-text text-transparent">Ready to Start?</h1>
-                    <p className="text-gray-400 text-sm mt-4">Ensure your camera and microphone are working before clicking Start.</p>
+                    <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+                    <h1 className="text-2xl font-bold text-white">Preparing Secure Environment</h1>
+                    <p className="text-gray-400 text-sm mt-3">Please complete the device setup to reveal your assessment questions.</p>
                 </div>
             )}
           </div>
@@ -502,16 +700,31 @@ const InterviewPanel = () => {
 
           <div className="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 flex flex-col shadow-2xl">
             <h3 className="text-[10px] font-black text-indigo-400 mb-6 uppercase tracking-[0.3em] flex items-center gap-2"><span className={`h-1.5 w-1.5 rounded-full ${status === "active" ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" : "bg-gray-600"}`} /> AI Interviewer</h3>
+            
             <div className="flex-1 overflow-y-auto mb-8">
               {status === "active" && drive?.driveType === "code base" ? (
-                 <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-sm text-indigo-50 leading-relaxed shadow-inner"><span className="font-bold text-indigo-300 block mb-2">Question {currentQ + 1}:</span>{questions[currentQ]?.question}</div>
+                 <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-sm text-indigo-50 leading-relaxed shadow-inner">
+                   <span className="font-bold text-indigo-300 block mb-2">Live Execution Active:</span>
+                   Code execution is isolated within your browser. All inputs and outputs are monitored for academic integrity.
+                 </div>
               ) : (
-                <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-sm text-indigo-50 leading-relaxed shadow-inner">{status === "active" ? "System active. AI proctoring is continuously monitoring face visibility, attention, and environment integrity." : isModelsLoaded ? "Welcome. AI Models loaded. Ensure you are in a quiet room with stable lighting." : "Initializing AI Proctoring Subsystems. Please wait..."}</div>
+                <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-sm text-indigo-50 leading-relaxed shadow-inner">
+                  {status === "active" 
+                    ? "System active. AI proctoring is continuously monitoring face visibility, attention, and environment integrity." 
+                    : isModelsLoaded 
+                      ? "Authentication pending. Please complete the device setup to authorize access." 
+                      : "Initializing AI Proctoring Subsystems. Please wait..."}
+                </div>
               )}
             </div>
+
             <div className="flex justify-center">
-              <button onClick={toggleInterview} disabled={!isModelsLoaded && status === "idle"} className={`w-full max-w-[300px] flex items-center justify-center gap-3 py-4 rounded-2xl border transition-all active:scale-95 text-[10px] font-black uppercase tracking-[0.2em] ${!isModelsLoaded && status === "idle" ? "bg-gray-800/50 border-gray-700 text-gray-500 cursor-not-allowed" : status === "idle" ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-400 hover:bg-indigo-500 hover:text-white" : "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"}`}>
-                {status === "idle" ? <>{isModelsLoaded ? "Start Interview" : "Loading AI..."}</> : <>Submit & End</>}
+              <button 
+                onClick={toggleInterview} 
+                disabled={status === "idle"} 
+                className={`w-full max-w-[300px] flex items-center justify-center gap-3 py-4 rounded-2xl border transition-all active:scale-95 text-[10px] font-black uppercase tracking-[0.2em] ${status === "idle" ? "bg-gray-800/50 border-gray-700 text-gray-500 cursor-not-allowed" : "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"}`}
+              >
+                {status === "idle" ? "Awaiting Setup" : "Submit & End"}
               </button>
             </div>
           </div>
