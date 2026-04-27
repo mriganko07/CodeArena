@@ -292,6 +292,7 @@ const DrivePreview = () => {
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <DateTime />
+          
 
         <h1 className="text-3xl font-bold mb-10 bg-gradient-to-r from-indigo-500 via-indigo-400 to-indigo-300 bg-clip-text text-transparent">
           Welcome, {fullName}
