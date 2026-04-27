@@ -107,7 +107,7 @@ const Header = () => {
                                     My Profile
                                 </a>
 
-                                <a href="/change-password" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
+                                <a href="/forgot" className="flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-slate-200 hover:bg-white/10">
                                     <Lock size={16} strokeWidth={3} />
                                     Change Password
                                 </a>
