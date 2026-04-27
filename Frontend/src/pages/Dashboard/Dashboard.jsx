@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import styles from './Dashboard.module.css';
-import InterViewHeader from '../../components/InterViewHeader';
+import Header from '../../components/Header';
 import DateTime from '../../components/DateTime';
 
 
@@ -64,7 +64,7 @@ const Dashboard = () => {
   return (
       <div className={styles.dashboard}>
         {/* header fetched from adhip halder */}
-        <InterViewHeader />
+        <Header />
       {/* Header Section */}
       <header className={styles.header}>
         <div className={styles.headerContent}>

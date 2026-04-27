@@ -95,6 +95,15 @@ router.put("/interviews/:id", async (req, res) => {
   }
 });
 
+router.delete("/interviews/:id", async (req, res) => {
+  try {
+    await Interview.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: "Interview assignment deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to delete interview assignment" });
+  }
+});
+
 router.get("/results", async (req, res) => {
   try {
     const results = await InterviewResult.find()
