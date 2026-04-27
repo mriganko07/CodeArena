@@ -532,7 +532,7 @@ const InterviewPanel = () => {
             {liveTime.toLocaleDateString("en-US", { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           </h2>
           <p className="text-sm font-medium text-gray-300 mt-0.5">
-            {liveTime.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', second: '2-digit' })} <span className="text-gray-500">(Live Time)</span>
+            {liveTime.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </p>
         </div>
         
